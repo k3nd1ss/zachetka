@@ -1,0 +1,469 @@
+/* ===== Цвета и общие значения ===== */
+:root {
+  color-scheme: light;
+  --ink: #1f2a37;
+  --muted: #566070;
+  --paper: #f5f3ee;
+  --card: #ffffff;
+  --line: #d8d4ca;
+  --accent: #0f5c63;
+  --accent-soft: #e0eff0;
+  --danger: #991b1b;
+  --tab-height: 60px;
+}
+
+/* ===== Основа (сначала всё пишем для телефона) ===== */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  /* Длинное слово переносится, а не создаёт горизонтальную прокрутку */
+  overflow-wrap: anywhere;
+}
+
+/* Пока открыто модальное окно, страница под ним не прокручивается */
+body:has(.modal[open]) {
+  overflow: hidden;
+}
+
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+/* ===== Шапка ===== */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+/* ===== Вкладки: на телефоне панель внизу, под большим пальцем ===== */
+.tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+
+.tab {
+  min-height: var(--tab-height);
+  border: 0;
+  border-top: 3px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab[aria-current="page"] {
+  border-top-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ===== Основная область ===== */
+.content {
+  display: grid;
+  gap: 12px;
+  /* Снизу запас, чтобы панель вкладок не закрывала последнюю карточку */
+  padding: 12px 12px calc(var(--tab-height) + 16px);
+}
+
+.warning {
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+.empty-message {
+  padding: 24px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.card-list {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+/* ===== Кнопки и поля: не меньше 44×44 px, шрифт 16 px для iOS ===== */
+.button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.button-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.button-wide {
+  width: 100%;
+}
+
+.button:focus-visible,
+.tab:focus-visible,
+.input:focus-visible,
+.closed-summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #8b8f96;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+textarea.input {
+  min-height: 88px;
+  resize: vertical;
+}
+
+/* ===== Карточка предмета ===== */
+.card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.card-title {
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+
+.card-meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ===== Прогресс ===== */
+.progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #e4e1d9;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+}
+
+.progress-text {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ===== Работы ===== */
+.work-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.work-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 10px;
+}
+
+.work-title {
+  font-weight: 600;
+}
+
+.work-type,
+.work-empty {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.work-note {
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+}
+
+/* Статус отличается и цветом, и текстом */
+.status-select {
+  font-weight: 600;
+}
+
+.status-todo {
+  border-color: #6b7280;
+  background: #eceff3;
+  color: #37404d;
+}
+
+.status-done {
+  border-color: #1e40af;
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-rejected {
+  border-color: #991b1b;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-submitted {
+  border-color: #166534;
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* ===== Фильтр и подсказка первого запуска ===== */
+.filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.hint {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+.hint-title {
+  font-size: 1.05rem;
+}
+
+.hint-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+/* ===== Резервная копия в настройках ===== */
+.backup {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.backup-title {
+  font-size: 1.05rem;
+}
+
+.backup-text {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ===== Закрытые предметы ===== */
+.closed-block {
+  min-width: 0;
+}
+
+.closed-summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 4px;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.closed-block .card-list {
+  margin-top: 8px;
+}
+
+/* ===== Модальное окно: влезает в экран и прокручивается внутри ===== */
+.modal {
+  width: calc(100% - 24px);
+  max-width: 520px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  padding: 16px;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 12px;
+  color: var(--ink);
+}
+
+.modal::backdrop {
+  background: rgba(20, 25, 32, 0.55);
+}
+
+.modal-title {
+  margin-bottom: 14px;
+  font-size: 1.2rem;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.field .input {
+  font-weight: 400;
+}
+
+.form-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.form-error:empty {
+  display: none;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.form-actions .button {
+  flex: 1 1 120px;
+}
+
+.modal-text {
+  margin-bottom: 14px;
+}
+
+/* ===== Планшет и компьютер: вкладки переезжают в шапку ===== */
+@media (min-width: 900px) {
+  .app-header {
+    justify-content: flex-start;
+    gap: 24px;
+    padding: 0 24px;
+  }
+
+  .tabs {
+    position: static;
+    display: flex;
+    border-top: 0;
+  }
+
+  .tab {
+    min-width: 130px;
+    border-top: 0;
+    border-bottom: 3px solid transparent;
+  }
+
+  .tab[aria-current="page"] {
+    border-bottom-color: var(--accent);
+  }
+
+  #settings-button {
+    margin-left: auto;
+  }
+
+  .content {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 20px 24px 32px;
+  }
+
+  .warning {
+    margin: 20px 24px 0;
+  }
+
+  .card-list {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+
+  .filter {
+    max-width: 640px;
+  }
+
+  /* На широком экране главная кнопка не растягивается на всю ширину */
+  .content > .button-wide {
+    justify-self: start;
+    width: auto;
+  }
+}

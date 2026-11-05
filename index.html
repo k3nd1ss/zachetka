@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Дневник студента</title>
+  <!-- Пустая иконка: браузер не будет искать favicon.ico и писать ошибку в консоль -->
+  <link rel="icon" href="data:,">
+  <!-- Путь относительный: иначе на GitHub Pages стили не загрузятся -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="app-title">Дневник студента</h1>
+
+    <!-- На телефоне эта панель прижата к низу экрана, на компьютере стоит в шапке -->
+    <nav class="tabs" aria-label="Разделы">
+      <button class="tab" type="button" data-tab="subjects">Предметы</button>
+      <button class="tab" type="button" data-tab="debts">Долги</button>
+    </nav>
+
+    <button id="settings-button" class="button" type="button">Настройки</button>
+  </header>
+
+  <!-- Предупреждение появляется, только если с хранилищем что-то не так -->
+  <p id="storage-warning" class="warning" role="alert" hidden></p>
+
+  <!-- Сюда app.js выводит содержимое открытой вкладки -->
+  <main id="content" class="content"></main>
+
+  <!-- Единственное модальное окно: app.js каждый раз наполняет его нужной формой -->
+  <dialog id="modal" class="modal"></dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
