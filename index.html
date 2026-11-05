@@ -15,7 +15,17 @@
 </head>
 <body>
   <header class="app-header">
-    <h1 class="app-title">Дневник студента</h1>
+    <h1 class="app-title">
+      <!-- Значок нарисован прямо здесь, поэтому перекрашивается вместе с оформлением -->
+      <svg class="app-logo" viewBox="0 0 512 512" aria-hidden="true">
+        <rect class="logo-back" x="10" y="10" width="492" height="492" rx="104"/>
+        <rect x="136" y="104" width="240" height="304" rx="20" fill="#f5f3ee"/>
+        <path d="M156 104h28v304h-28a20 20 0 0 1-20-20V124a20 20 0 0 1 20-20z" fill="#c9c4b6"/>
+        <rect class="logo-line" x="212" y="146" width="128" height="20" rx="10"/>
+        <path class="logo-check" d="M220 284l44 44 80-96"/>
+      </svg>
+      Дневник студента
+    </h1>
 
     <!-- На телефоне эта панель прижата к низу экрана, на компьютере стоит в шапке -->
     <nav class="tabs" aria-label="Разделы">

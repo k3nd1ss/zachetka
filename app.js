@@ -46,6 +46,7 @@ const PROFILE_FIELDS = [
 let currentTab = "subjects"; // открытая вкладка
 let closedBlockOpen = false; // развёрнут ли блок «Закрытые предметы»
 let workFilter = { status: "all", type: "all" }; // выбранный фильтр работ
+const expandedSubjects = new Set(); // id развёрнутых карточек предметов
 let data = loadData(); // все данные пользователя
 
 /* ===== 3. Сохранение и загрузка ===== */
@@ -431,7 +432,10 @@ function submitSubjectForm(form, error, subject, forDebt) {
   if (subject) {
     Object.assign(subject, values);
   } else {
-    data.subjects.push({ id: createId(), ...values, works: [] });
+    // Новую карточку сразу разворачиваем, чтобы можно было добавить работы
+    const id = createId();
+    expandedSubjects.add(id);
+    data.subjects.push({ id: id, ...values, works: [] });
   }
   updateAndClose();
 }
@@ -656,14 +660,54 @@ function applyTheme() {
   document.querySelector('meta[name="theme-color"]').content = color;
 }
 
-// Отмечает выбранный кружок и обновляет поле «Свой цвет»
-function showSelectedColor() {
-  for (const swatch of document.querySelectorAll(".swatch")) {
-    swatch.setAttribute("aria-pressed", String(swatch.dataset.color === data.accentColor));
+// Переводит цвет из #rrggbb в оттенок, насыщенность и светлоту (HSL)
+function hexToHsl(hex) {
+  const [r, g, b] = hexToRgb(hex).map((part) => part / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const light = (max + min) / 2;
+  if (delta === 0) {
+    return { h: 0, s: 0, l: Math.round(light * 100) };
   }
-  const customInput = document.querySelector(".color-input");
-  if (customInput) {
-    customInput.value = data.accentColor;
+  const saturation = delta / (1 - Math.abs(2 * light - 1));
+  let hue = (r - g) / delta + 4;
+  if (max === r) {
+    hue = ((g - b) / delta + 6) % 6;
+  } else if (max === g) {
+    hue = (b - r) / delta + 2;
+  }
+  return { h: Math.round(hue * 60) % 360, s: Math.round(saturation * 100), l: Math.round(light * 100) };
+}
+
+// Обратный перевод: из HSL в #rrggbb
+function hslToHex(h, s, l) {
+  const saturation = s / 100;
+  const light = l / 100;
+  const amount = saturation * Math.min(light, 1 - light);
+  const channel = (n) => {
+    const k = (n + h / 30) % 12;
+    return 255 * (light - amount * Math.max(-1, Math.min(k - 3, 9 - k, 1)));
+  };
+  return rgbToHex([channel(0), channel(8), channel(4)]);
+}
+
+function isPresetColor(color) {
+  return ACCENT_COLORS.some((preset) => preset.value === color);
+}
+
+// Отмечает выбранный кружок и показывает текущий цвет в строке «Свой цвет»
+function showSelectedColor() {
+  const color = data.accentColor;
+  for (const swatch of document.querySelectorAll(".swatch")) {
+    swatch.setAttribute("aria-pressed", String(swatch.dataset.color === color));
+  }
+  const dot = document.querySelector(".custom-dot");
+  if (dot) {
+    dot.classList.toggle("custom-dot-active", !isPresetColor(color));
+    dot.style.setProperty("--dot-color", color);
+    dot.style.color = getTextColorOn(color);
+    document.getElementById("preview-dot").style.background = color;
   }
 }
 
@@ -672,6 +716,55 @@ function setAccentColor(color) {
   applyTheme();
   saveData();
   showSelectedColor();
+}
+
+// Цветные полоски ползунков зависят от остальных двух значений
+function updateSliderTracks(h, s, l) {
+  const saturation = document.getElementById("slider-s");
+  const light = document.getElementById("slider-l");
+  saturation.style.setProperty("--track", "linear-gradient(to right, hsl(" + h + ", 0%, " + l + "%), hsl(" + h + ", 100%, " + l + "%))");
+  light.style.setProperty("--track", "linear-gradient(to right, #000000, hsl(" + h + ", " + s + "%, 50%), #ffffff)");
+}
+
+// Ставит ползунки в положение, соответствующее текущему цвету
+function syncSliders() {
+  const { h, s, l } = hexToHsl(data.accentColor);
+  document.getElementById("slider-h").value = h;
+  document.getElementById("slider-s").value = s;
+  document.getElementById("slider-l").value = l;
+  updateSliderTracks(h, s, l);
+}
+
+function syncHexInput() {
+  const input = document.getElementById("hex-input");
+  input.value = data.accentColor.toUpperCase();
+  input.removeAttribute("aria-invalid");
+}
+
+function applySliders() {
+  const h = Number(document.getElementById("slider-h").value);
+  const s = Number(document.getElementById("slider-s").value);
+  const l = Number(document.getElementById("slider-l").value);
+  updateSliderTracks(h, s, l);
+  setAccentColor(hslToHex(h, s, l));
+  syncHexInput();
+}
+
+// Принимает код с решёткой и без неё. Если код неполный, возвращает null
+function parseHex(text) {
+  const value = text.trim().replace(/^#/, "");
+  return /^[0-9a-f]{6}$/i.test(value) ? "#" + value.toLowerCase() : null;
+}
+
+function applyHexInput(input) {
+  const color = parseHex(input.value);
+  if (color === null) {
+    input.setAttribute("aria-invalid", "true");
+    return;
+  }
+  input.removeAttribute("aria-invalid");
+  setAccentColor(color);
+  syncSliders();
 }
 
 function createSwatch(color) {
@@ -683,26 +776,92 @@ function createSwatch(color) {
   swatch.title = color.name;
   swatch.setAttribute("aria-label", color.name);
   swatch.setAttribute("aria-pressed", String(color.value === data.accentColor));
-  swatch.addEventListener("click", () => setAccentColor(color.value));
+  swatch.addEventListener("click", () => {
+    setAccentColor(color.value);
+    syncSliders();
+    syncHexInput();
+  });
   return swatch;
+}
+
+function createSlider(id, label, max) {
+  const slider = createElement("input", "slider");
+  slider.type = "range";
+  slider.id = id;
+  slider.min = "0";
+  slider.max = String(max);
+  slider.addEventListener("input", applySliders);
+  return createField(label, slider);
+}
+
+// Кружок с текущим цветом и поле для кода цвета
+function createHexRow() {
+  const input = createInput("hexColor", "text", "");
+  input.id = "hex-input";
+  input.maxLength = 7;
+  input.spellcheck = false;
+  input.autocomplete = "off";
+  input.addEventListener("input", () => applyHexInput(input));
+  // Неполный код при выходе из поля заменяем на текущий цвет
+  input.addEventListener("blur", syncHexInput);
+
+  const preview = createElement("span", "preview-dot");
+  preview.id = "preview-dot";
+  const row = createElement("div", "hex-row");
+  row.append(preview, createField("Код цвета", input));
+  return row;
+}
+
+function createCustomPanel() {
+  const panel = createElement("div", "custom-panel");
+  panel.id = "custom-panel";
+  panel.hidden = isPresetColor(data.accentColor);
+  panel.append(
+    createHexRow(),
+    createSlider("slider-h", "Оттенок", 360),
+    createSlider("slider-s", "Насыщенность", 100),
+    createSlider("slider-l", "Светлота", 100)
+  );
+  return panel;
+}
+
+// Строка «Свой цвет»: открывает и закрывает панель с ползунками
+function createCustomToggle(panel) {
+  const toggle = createElement("button", "custom-toggle");
+  toggle.type = "button";
+  toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  toggle.setAttribute("aria-controls", panel.id);
+  toggle.append(
+    createElement("span", "custom-dot"),
+    createElement("span", "custom-label", "Свой цвет"),
+    createElement("span", "card-chevron")
+  );
+  toggle.addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  });
+  return toggle;
 }
 
 function createColorSection() {
   const section = createElement("div", "settings-section");
   const swatches = createElement("div", "swatches");
   swatches.append(...ACCENT_COLORS.map(createSwatch));
-
-  const customInput = createInput("customColor", "color", data.accentColor);
-  customInput.classList.add("color-input");
-  customInput.addEventListener("input", () => setAccentColor(customInput.value));
-
+  const panel = createCustomPanel();
   section.append(
     createElement("h3", "settings-title", "Цвет оформления"),
-    createElement("p", "settings-text", "Цвет применяется сразу. Нравится другой? Выбери любой в палитре."),
     swatches,
-    createField("Свой цвет", customInput)
+    createCustomToggle(panel),
+    panel
   );
   return section;
+}
+
+// Заполняет панель цвета: это можно сделать, только когда она уже на странице
+function initColorSection() {
+  showSelectedColor();
+  syncSliders();
+  syncHexInput();
 }
 
 /* ===== 11. Настройки ===== */
@@ -725,6 +884,7 @@ function openSettings() {
   });
 
   openModal("Настройки", form, createColorSection(), createBackupSection());
+  initColorSection();
 }
 
 function submitSettings(form, error) {
@@ -760,7 +920,7 @@ function createSubjectMeta(subject) {
   if (subject.teacher !== "") {
     parts.unshift(subject.teacher);
   }
-  return createElement("p", "card-meta", parts.join(" · "));
+  return createElement("span", "card-meta", parts.join(" · "));
 }
 
 function createProgress(subject) {
@@ -835,28 +995,67 @@ function getDebtWorksView(subject) {
   };
 }
 
-function createSubjectCard(subject, getWorksView) {
-  const view = getWorksView(subject);
-  const card = createElement("article", "card");
-  const header = createElement("div");
-  header.append(
-    createElement("h3", "card-title", subject.name),
-    createSubjectMeta(subject)
-  );
+function isFilterActive() {
+  return workFilter.status !== "all" || workFilter.type !== "all";
+}
 
+// Разворачивает или сворачивает карточку
+function toggleSubject(subject) {
+  if (expandedSubjects.has(subject.id)) {
+    expandedSubjects.delete(subject.id);
+  } else {
+    expandedSubjects.add(subject.id);
+  }
+  render();
+  // После перерисовки возвращаем фокус на ту же карточку
+  document.getElementById("toggle-" + subject.id).focus({ preventScroll: true });
+}
+
+// Заголовок карточки — большая кнопка: нажатие в любом месте сворачивает и разворачивает
+function createCardToggle(subject, expanded, locked) {
+  const toggle = createElement("button", "card-toggle");
+  toggle.type = "button";
+  toggle.id = "toggle-" + subject.id;
+  toggle.disabled = locked;
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.addEventListener("click", () => toggleSubject(subject));
+
+  const text = createElement("span", "card-toggle-text");
+  text.append(createElement("span", "card-title", subject.name), createSubjectMeta(subject));
+  toggle.append(text, createElement("span", "card-chevron"));
+
+  const heading = createElement("h3", "card-heading");
+  heading.append(toggle);
+  return heading;
+}
+
+// То, что видно только в развёрнутой карточке
+function createCardDetails(subject, view) {
   const actions = createElement("div", "action-row");
   actions.append(
     createButton("Изменить", "", () => openSubjectForm(subject, false)),
     createButton("Удалить", "button-danger", () => confirmDeleteSubject(subject))
   );
 
-  card.append(header, actions, createProgress(subject));
+  const nodes = [actions];
   if (view.works.length > 0 || view.emptyText !== "") {
-    card.append(createWorkList(subject, view.works, view.emptyText));
+    nodes.push(createWorkList(subject, view.works, view.emptyText));
   }
-  card.append(
-    createButton("+ Добавить работу", "button-wide", () => openWorkForm(subject, null))
-  );
+  nodes.push(createButton("+ Добавить работу", "button-wide", () => openWorkForm(subject, null)));
+  return nodes;
+}
+
+function createSubjectCard(subject, getWorksView) {
+  const view = getWorksView(subject);
+  // При включённом фильтре карточки открыты: иначе результат фильтра не был бы виден
+  const locked = getWorksView === getSubjectWorksView && isFilterActive();
+  const expanded = locked || expandedSubjects.has(subject.id);
+
+  const card = createElement("article", "card");
+  card.append(createCardToggle(subject, expanded, locked), createProgress(subject));
+  if (expanded) {
+    card.append(...createCardDetails(subject, view));
+  }
   return card;
 }
 
