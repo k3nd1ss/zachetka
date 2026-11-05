@@ -6,8 +6,11 @@
   --paper: #f5f3ee;
   --card: #ffffff;
   --line: #d8d4ca;
+  /* Эти четыре цвета app.js заменяет на выбранный пользователем */
   --accent: #0f5c63;
-  --accent-soft: #e0eff0;
+  --accent-soft: #dbe7e8;
+  --accent-text: #0f5c63;
+  --on-accent: #ffffff;
   --danger: #991b1b;
   --tab-height: 60px;
 }
@@ -64,7 +67,7 @@ p {
   bottom: 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   background: var(--card);
   border-top: 1px solid var(--line);
 }
@@ -81,9 +84,9 @@ p {
 }
 
 .tab[aria-current="page"] {
-  border-top-color: var(--accent);
+  border-top-color: var(--accent-text);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ===== Основная область ===== */
@@ -132,9 +135,9 @@ p {
 }
 
 .button-primary {
-  border-color: var(--accent);
+  border-color: var(--accent-text);
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -151,7 +154,7 @@ p {
 .tab:focus-visible,
 .input:focus-visible,
 .closed-summary:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--accent-text);
   outline-offset: 2px;
 }
 
@@ -211,6 +214,8 @@ textarea.input {
 .progress-bar {
   height: 100%;
   background: var(--accent);
+  /* Контур, чтобы полоска была видна и при очень светлом цвете */
+  box-shadow: inset 0 0 0 1px var(--accent-text);
 }
 
 .progress-text {
@@ -302,7 +307,7 @@ textarea.input {
   justify-items: start;
   gap: 8px;
   padding: 14px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-text);
   border-radius: 10px;
   background: var(--accent-soft);
 }
@@ -316,8 +321,8 @@ textarea.input {
   padding-left: 20px;
 }
 
-/* ===== Резервная копия в настройках ===== */
-.backup {
+/* ===== Разделы настроек ===== */
+.settings-section {
   display: grid;
   gap: 8px;
   margin-top: 18px;
@@ -325,11 +330,11 @@ textarea.input {
   border-top: 1px solid var(--line);
 }
 
-.backup-title {
+.settings-title {
   font-size: 1.05rem;
 }
 
-.backup-text {
+.settings-text {
   color: var(--muted);
   font-size: 0.95rem;
 }
@@ -390,6 +395,55 @@ textarea.input {
   font-weight: 400;
 }
 
+.field-hint {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.field-hint:empty {
+  display: none;
+}
+
+/* ===== Выбор цвета ===== */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.swatch {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Выбранный цвет отмечен галочкой, а не только рамкой */
+.swatch[aria-pressed="true"]::after {
+  content: "✓";
+}
+
+.swatch[aria-pressed="true"] {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.swatch:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.color-input {
+  padding: 4px;
+  cursor: pointer;
+}
+
 .form-error {
   color: var(--danger);
   font-weight: 600;
@@ -436,7 +490,7 @@ textarea.input {
   }
 
   .tab[aria-current="page"] {
-    border-bottom-color: var(--accent);
+    border-bottom-color: var(--accent-text);
   }
 
   #settings-button {
@@ -457,8 +511,13 @@ textarea.input {
     grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   }
 
-  .filter {
+  .filter,
+  .profile {
     max-width: 640px;
+  }
+
+  .profile {
+    width: 100%;
   }
 
   /* На широком экране главная кнопка не растягивается на всю ширину */

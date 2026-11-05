@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Дневник студента">
+  <!-- Фон иконки -->
+  <rect width="512" height="512" rx="96" fill="#0f5c63"/>
+  <!-- Зачётка: обложка, корешок и строки заголовка -->
+  <rect x="136" y="104" width="240" height="304" rx="20" fill="#f5f3ee"/>
+  <path d="M156 104h28v304h-28a20 20 0 0 1-20-20V124a20 20 0 0 1 20-20z" fill="#c9c4b6"/>
+  <rect x="212" y="146" width="128" height="20" rx="10" fill="#0f5c63"/>
+  <rect x="212" y="182" width="84" height="20" rx="10" fill="#7fa9ac"/>
+  <!-- Галочка: работа сдана -->
+  <path d="M220 284l44 44 80-96" fill="none" stroke="#0f5c63" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

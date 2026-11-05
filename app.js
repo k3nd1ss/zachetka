@@ -16,6 +16,31 @@ const WORK_STATUS_LABELS = {
   submitted: "Сдана",
 };
 
+// Цвет оформления по умолчанию и 10 готовых цветов на выбор
+const DEFAULT_ACCENT = "#0f5c63";
+const ACCENT_COLORS = [
+  { name: "Красный", value: "#d32f2f" },
+  { name: "Оранжевый", value: "#ef6c00" },
+  { name: "Жёлтый", value: "#f9c80e" },
+  { name: "Зелёный", value: "#2e7d32" },
+  { name: "Бирюзовый", value: DEFAULT_ACCENT },
+  { name: "Голубой", value: "#0288d1" },
+  { name: "Синий", value: "#1e4fc2" },
+  { name: "Фиолетовый", value: "#6a32b8" },
+  { name: "Розовый", value: "#d81b7a" },
+  { name: "Коричневый", value: "#6d4c41" },
+];
+
+// Поля профиля: код для хранения и подпись на экране
+const PROFILE_FIELDS = [
+  { key: "fullName", label: "ФИО" },
+  { key: "university", label: "Вуз" },
+  { key: "faculty", label: "Факультет или институт" },
+  { key: "direction", label: "Направление подготовки" },
+  { key: "group", label: "Группа" },
+  { key: "recordBook", label: "Номер зачётной книжки" },
+];
+
 /* ===== 2. Состояние приложения ===== */
 
 let currentTab = "subjects"; // открытая вкладка
@@ -26,7 +51,12 @@ let data = loadData(); // все данные пользователя
 /* ===== 3. Сохранение и загрузка ===== */
 
 function createEmptyData() {
-  return { currentSemester: null, subjects: [] };
+  return {
+    currentSemester: null,
+    accentColor: DEFAULT_ACCENT,
+    profile: normalizeProfile({}),
+    subjects: [],
+  };
 }
 
 function createId() {
@@ -95,8 +125,24 @@ function toSemester(value) {
 function normalizeData(raw) {
   return {
     currentSemester: toSemester(raw.currentSemester),
+    accentColor: toAccentColor(raw.accentColor),
+    profile: normalizeProfile(isObject(raw.profile) ? raw.profile : {}),
     subjects: raw.subjects.filter(isObject).map(normalizeSubject),
   };
+}
+
+// Цвет должен иметь вид #rrggbb, иначе берём цвет по умолчанию.
+// В старых файлах экспорта цвета и профиля нет: они тоже получат значения по умолчанию
+function toAccentColor(value) {
+  return /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : DEFAULT_ACCENT;
+}
+
+function normalizeProfile(raw) {
+  const profile = {};
+  for (const field of PROFILE_FIELDS) {
+    profile[field.key] = toText(raw[field.key]);
+  }
+  return profile;
 }
 
 function normalizeSubject(raw) {
@@ -141,6 +187,15 @@ function isClosed(subject) {
 // Всё остальное показывается во вкладке «Предметы»
 function isActive(subject) {
   return !isPastSemester(subject);
+}
+
+// В учебном году 2 семестра: 1–2 семестр — 1 курс, 3–4 — 2 курс, 5–6 — 3 курс
+function getCourse(semester) {
+  return Math.ceil(semester / 2);
+}
+
+function formatSemester(semester) {
+  return getCourse(semester) + " курс, " + semester + " семестр";
 }
 
 // Сколько работ предмета уже сдано
@@ -209,6 +264,20 @@ function createSelect(name, labels, value) {
 function createField(labelText, control) {
   const field = createElement("label", "field", labelText);
   field.append(control);
+  return field;
+}
+
+// Поле семестра: под ним сразу видно, какой это курс
+function createSemesterField(labelText, input) {
+  const hint = createElement("span", "field-hint");
+  const updateHint = () => {
+    const semester = toSemester(input.value);
+    hint.textContent = semester === null ? "" : "Это " + getCourse(semester) + " курс";
+  };
+  input.addEventListener("input", updateHint);
+  updateHint();
+  const field = createField(labelText, input);
+  field.append(hint);
   return field;
 }
 
@@ -308,7 +377,7 @@ function openSubjectForm(subject, forDebt) {
   form.append(
     createField("Название", nameInput),
     createField("Преподаватель", createInput("teacher", "text", values.teacher)),
-    createField("Номер семестра", semesterInput),
+    createSemesterField("Номер семестра", semesterInput),
     createField("Форма контроля", createSelect("control", CONTROL_LABELS, values.control)),
     createField("Итог по предмету", createSelect("result", RESULT_LABELS, values.result)),
     error,
@@ -514,21 +583,129 @@ function createImportControls(error) {
 }
 
 function createBackupSection() {
-  const section = createElement("div", "backup");
+  const section = createElement("div", "settings-section");
   const error = createElement("p", "form-error");
   error.setAttribute("role", "alert");
   const buttons = createElement("div", "action-row");
   buttons.append(createButton("Экспорт в файл", "", exportData), ...createImportControls(error));
   section.append(
-    createElement("h3", "backup-title", "Резервная копия"),
-    createElement("p", "backup-text", "Данные хранятся только в этом браузере. Файл защитит их от потери и поможет перенести на другое устройство."),
+    createElement("h3", "settings-title", "Резервная копия"),
+    createElement("p", "settings-text", "Данные хранятся только в этом браузере. Файл защитит их от потери и поможет перенести на другое устройство."),
     buttons,
     error
   );
   return section;
 }
 
-/* ===== 10. Настройки ===== */
+/* ===== 10. Цвет оформления ===== */
+
+function hexToRgb(hex) {
+  return [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+}
+
+function rgbToHex(rgb) {
+  return "#" + rgb.map((part) => Math.round(part).toString(16).padStart(2, "0")).join("");
+}
+
+// Смешивает два цвета. share — доля второго цвета от 0 до 1
+function mixColors(first, second, share) {
+  const target = hexToRgb(second);
+  return rgbToHex(hexToRgb(first).map((part, i) => part + (target[i] - part) * share));
+}
+
+// Яркость цвета по формуле из стандарта доступности WCAG
+function getLuminance(hex) {
+  const [r, g, b] = hexToRgb(hex).map((part) => {
+    const channel = part / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// Контраст двух цветов: чем больше число, тем легче читать текст
+function getContrast(first, second) {
+  const a = getLuminance(first);
+  const b = getLuminance(second);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+// Какой текст читается на этом фоне: белый или чёрный. Один из них подходит для любого цвета
+function getTextColorOn(background) {
+  return getContrast(background, "#ffffff") >= getContrast(background, "#000000") ? "#ffffff" : "#000000";
+}
+
+// Затемняет цвет, пока текст этого цвета не станет читаемым на фоне.
+// Без этого жёлтый или белый цвет сделал бы подписи невидимыми
+function getReadableColor(color, background) {
+  let result = color;
+  for (let share = 0.1; share <= 1 && getContrast(result, background) < 4.5; share += 0.1) {
+    result = mixColors(color, "#000000", share);
+  }
+  return result;
+}
+
+// Передаёт выбранный цвет в переменные CSS: весь интерфейс перекрашивается сам
+function applyTheme() {
+  const color = data.accentColor;
+  const soft = mixColors(color, "#ffffff", 0.85);
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty("--accent", color);
+  rootStyle.setProperty("--accent-soft", soft);
+  rootStyle.setProperty("--accent-text", getReadableColor(color, soft));
+  rootStyle.setProperty("--on-accent", getTextColorOn(color));
+  document.querySelector('meta[name="theme-color"]').content = color;
+}
+
+// Отмечает выбранный кружок и обновляет поле «Свой цвет»
+function showSelectedColor() {
+  for (const swatch of document.querySelectorAll(".swatch")) {
+    swatch.setAttribute("aria-pressed", String(swatch.dataset.color === data.accentColor));
+  }
+  const customInput = document.querySelector(".color-input");
+  if (customInput) {
+    customInput.value = data.accentColor;
+  }
+}
+
+function setAccentColor(color) {
+  data.accentColor = color;
+  applyTheme();
+  saveData();
+  showSelectedColor();
+}
+
+function createSwatch(color) {
+  const swatch = createElement("button", "swatch");
+  swatch.type = "button";
+  swatch.dataset.color = color.value;
+  swatch.style.background = color.value;
+  swatch.style.color = getTextColorOn(color.value);
+  swatch.title = color.name;
+  swatch.setAttribute("aria-label", color.name);
+  swatch.setAttribute("aria-pressed", String(color.value === data.accentColor));
+  swatch.addEventListener("click", () => setAccentColor(color.value));
+  return swatch;
+}
+
+function createColorSection() {
+  const section = createElement("div", "settings-section");
+  const swatches = createElement("div", "swatches");
+  swatches.append(...ACCENT_COLORS.map(createSwatch));
+
+  const customInput = createInput("customColor", "color", data.accentColor);
+  customInput.classList.add("color-input");
+  customInput.addEventListener("input", () => setAccentColor(customInput.value));
+
+  section.append(
+    createElement("h3", "settings-title", "Цвет оформления"),
+    createElement("p", "settings-text", "Цвет применяется сразу. Нравится другой? Выбери любой в палитре."),
+    swatches,
+    createField("Свой цвет", customInput)
+  );
+  return section;
+}
+
+/* ===== 11. Настройки ===== */
 
 function openSettings() {
   const form = createElement("form", "form");
@@ -537,7 +714,7 @@ function openSettings() {
   const semester = data.currentSemester === null ? "" : data.currentSemester;
 
   form.append(
-    createField("Текущий семестр", createNumberInput("currentSemester", semester)),
+    createSemesterField("Текущий семестр", createNumberInput("currentSemester", semester)),
     error,
     createFormActions("Сохранить")
   );
@@ -547,7 +724,7 @@ function openSettings() {
     submitSettings(form, error);
   });
 
-  openModal("Настройки", form, createBackupSection());
+  openModal("Настройки", form, createColorSection(), createBackupSection());
 }
 
 function submitSettings(form, error) {
@@ -561,7 +738,7 @@ function submitSettings(form, error) {
   updateAndClose();
 }
 
-/* ===== 11. Вывод на экран ===== */
+/* ===== 12. Вывод на экран ===== */
 
 // После любого изменения: сохранить данные и перерисовать экран
 function updateData() {
@@ -576,7 +753,7 @@ function updateAndClose() {
 
 function createSubjectMeta(subject) {
   const parts = [
-    subject.semester + " семестр",
+    formatSemester(subject.semester),
     CONTROL_LABELS[subject.control],
     "Итог: " + RESULT_LABELS[subject.result],
   ];
@@ -782,6 +959,38 @@ function renderDebtsTab() {
   return nodes;
 }
 
+// Поле профиля сохраняется сразу при вводе, поэтому кнопка «Сохранить» не нужна
+function createProfileField(field) {
+  const input = createInput(field.key, "text", data.profile[field.key]);
+  input.addEventListener("input", () => {
+    data.profile[field.key] = input.value;
+    saveData();
+  });
+  return createField(field.label, input);
+}
+
+function getCurrentStudyText() {
+  if (data.currentSemester === null) {
+    return "Текущий семестр не указан. Его можно задать в настройках.";
+  }
+  return "Сейчас: " + formatSemester(data.currentSemester);
+}
+
+function renderProfileTab() {
+  const card = createElement("section", "card profile");
+  const header = createElement("div");
+  header.append(
+    createElement("h2", "card-title", "Профиль студента"),
+    createElement("p", "card-meta", getCurrentStudyText())
+  );
+  card.append(
+    header,
+    ...PROFILE_FIELDS.map(createProfileField),
+    createElement("p", "card-meta", "Сохраняется автоматически и хранится только на этом устройстве. Профиль попадает и в файл экспорта, поэтому не выкладывай этот файл в открытый доступ.")
+  );
+  return [card];
+}
+
 function renderTabs() {
   const debtCount = data.subjects.filter(isDebt).length;
   for (const tab of document.querySelectorAll(".tab")) {
@@ -796,13 +1005,20 @@ function renderTabs() {
   }
 }
 
+// Какая функция рисует какую вкладку
+const TAB_RENDERERS = {
+  subjects: renderSubjectsTab,
+  debts: renderDebtsTab,
+  profile: renderProfileTab,
+};
+
 function render() {
+  applyTheme();
   renderTabs();
-  const nodes = currentTab === "subjects" ? renderSubjectsTab() : renderDebtsTab();
-  document.getElementById("content").replaceChildren(...nodes);
+  document.getElementById("content").replaceChildren(...TAB_RENDERERS[currentTab]());
 }
 
-/* ===== 12. Запуск ===== */
+/* ===== 13. Запуск ===== */
 
 function selectTab(tabName) {
   currentTab = tabName;
@@ -815,4 +1031,17 @@ for (const tab of document.querySelectorAll(".tab")) {
 }
 document.getElementById("settings-button").addEventListener("click", openSettings);
 
+// Манифест даёт иконку на главном экране Android и компьютера. При открытии
+// двойным кликом браузер не может его прочитать и пишет ошибку, поэтому там не подключаем
+function addManifestLink() {
+  if (location.protocol === "file:") {
+    return;
+  }
+  const link = createElement("link");
+  link.rel = "manifest";
+  link.href = "manifest.webmanifest";
+  document.head.append(link);
+}
+
+addManifestLink();
 render();

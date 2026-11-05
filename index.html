@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Дневник студента</title>
-  <!-- Пустая иконка: браузер не будет искать favicon.ico и писать ошибку в консоль -->
-  <link rel="icon" href="data:,">
+  <meta name="theme-color" content="#0f5c63">
+  <!-- Иконка на вкладке браузера -->
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <!-- Иконка на главном экране: для iPhone и iPad, для остальных она указана в манифесте -->
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Дневник">
   <!-- Путь относительный: иначе на GitHub Pages стили не загрузятся -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -17,6 +21,7 @@
     <nav class="tabs" aria-label="Разделы">
       <button class="tab" type="button" data-tab="subjects">Предметы</button>
       <button class="tab" type="button" data-tab="debts">Долги</button>
+      <button class="tab" type="button" data-tab="profile">Профиль</button>
     </nav>
 
     <button id="settings-button" class="button" type="button">Настройки</button>
