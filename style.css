@@ -11,6 +11,7 @@
   --accent-soft: #dbe7e8;
   --accent-text: #0f5c63;
   --on-accent: #ffffff;
+  --accent-bar: #0f5c63;
   --danger: #991b1b;
   --tab-height: 60px;
 }
@@ -144,8 +145,16 @@ p {
 
 .card-list {
   display: grid;
+  grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr));
   gap: 12px;
   align-items: start;
+  min-width: 0;
+}
+
+.card-column {
+  display: grid;
+  gap: 12px;
+  align-content: start;
   min-width: 0;
 }
 
@@ -303,9 +312,9 @@ textarea.input {
 
 .progress-bar {
   height: 100%;
-  background: var(--accent);
-  /* Контур, чтобы полоска была видна и при очень светлом цвете */
-  box-shadow: inset 0 0 0 1px var(--accent-text);
+  /* Те же скругления, что у дорожки: концы полоски круглые */
+  border-radius: inherit;
+  background: var(--accent-bar);
 }
 
 .progress-text {
@@ -364,6 +373,12 @@ textarea.input {
   border-color: #6b7280;
   background: #eceff3;
   color: #37404d;
+}
+
+.status-inProgress {
+  border-color: #a16207;
+  background: #fef3c7;
+  color: #854d0e;
 }
 
 .status-done {
@@ -760,10 +775,6 @@ textarea.input {
 
   .warning {
     margin: 20px 24px 0;
-  }
-
-  .card-list {
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   }
 
   .filter,

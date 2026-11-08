@@ -11,6 +11,7 @@ const RESULT_LABELS = { none: "Не сдавал", passed: "Сдал", failed: "
 const WORK_TYPE_LABELS = { lab: "Лабораторная", rgr: "РГР", other: "Другое" };
 const WORK_STATUS_LABELS = {
   todo: "Не сделана",
+  inProgress: "В работе",
   done: "Сделана, не сдана",
   rejected: "Пробовал сдать — не приняли",
   submitted: "Сдана",
@@ -202,6 +203,34 @@ function formatSemester(semester) {
 // Сколько работ предмета уже сдано
 function countSubmitted(subject) {
   return subject.works.filter((work) => work.status === "submitted").length;
+}
+
+// Порядок типов в списке: сначала лабораторные, потом РГР, потом остальное
+const WORK_TYPE_ORDER = Object.keys(WORK_TYPE_LABELS);
+
+// Сортирует работы для показа: по типу, затем по названию.
+// numeric: true сравнивает числа как числа, поэтому «ЛР 2» идёт раньше «ЛР 10».
+// Порядок в самих данных не меняется: slice() делает копию списка
+function sortWorks(works) {
+  return works.slice().sort((a, b) => {
+    const byType = WORK_TYPE_ORDER.indexOf(a.type) - WORK_TYPE_ORDER.indexOf(b.type);
+    return byType !== 0 ? byType : a.title.localeCompare(b.title, "ru", { numeric: true, sensitivity: "base" });
+  });
+}
+
+// Название для сравнения: без лишних пробелов и без разницы в регистре
+function simplifyTitle(title) {
+  return title.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+// Есть ли у предмета другая работа того же типа с таким же названием
+function hasDuplicateWork(subject, values, editedWork) {
+  return subject.works.some(
+    (work) =>
+      work !== editedWork &&
+      work.type === values.type &&
+      simplifyTitle(work.title) === simplifyTitle(values.title)
+  );
 }
 
 function getUnsubmittedWorks(subject) {
@@ -497,6 +526,10 @@ function submitWorkForm(form, error, subject, work) {
     error.textContent = "Укажи название или номер работы.";
     return;
   }
+  if (hasDuplicateWork(subject, values, work)) {
+    error.textContent = "Такая работа уже есть: «" + values.title + "» (" + WORK_TYPE_LABELS[values.type] + ").";
+    return;
+  }
 
   if (work) {
     Object.assign(work, values);
@@ -657,6 +690,8 @@ function applyTheme() {
   rootStyle.setProperty("--accent-soft", soft);
   rootStyle.setProperty("--accent-text", getReadableColor(color, soft));
   rootStyle.setProperty("--on-accent", getTextColorOn(color));
+  // Очень светлая полоска (белая, салатовая) сольётся с фоном, поэтому берём затемнённый цвет
+  rootStyle.setProperty("--accent-bar", getLuminance(color) > 0.7 ? getReadableColor(color, soft) : color);
   document.querySelector('meta[name="theme-color"]').content = color;
 }
 
@@ -984,13 +1019,13 @@ function createWorkList(subject, works, emptyText) {
 // Какие работы показать в обычной карточке и что написать, если их нет
 function getSubjectWorksView(subject) {
   const emptyText = subject.works.length === 0 ? "" : "Нет работ, подходящих под фильтр.";
-  return { works: subject.works.filter(matchesFilter), emptyText: emptyText };
+  return { works: sortWorks(subject.works.filter(matchesFilter)), emptyText: emptyText };
 }
 
 // В карточке долга — только несданные работы
 function getDebtWorksView(subject) {
   return {
-    works: getUnsubmittedWorks(subject),
+    works: sortWorks(getUnsubmittedWorks(subject)),
     emptyText: "Несданных работ нет. Осталось закрыть сам предмет.",
   };
 }
@@ -1059,9 +1094,33 @@ function createSubjectCard(subject, getWorksView) {
   return card;
 }
 
+// Сколько колонок карточек помещается. Значения совпадают с @media в style.css
+const TWO_COLUMNS = window.matchMedia("(min-width: 900px)");
+const THREE_COLUMNS = window.matchMedia("(min-width: 1300px)");
+
+function getColumnCount() {
+  if (THREE_COLUMNS.matches) {
+    return 3;
+  }
+  return TWO_COLUMNS.matches ? 2 : 1;
+}
+
+// Карточки раскладываются по колонкам по очереди: 1-я, 2-я, 3-я, снова 1-я...
+// У каждой колонки своя высота, поэтому открытая карточка сдвигает вниз
+// только карточки своей колонки, а соседние остаются на месте
 function createCardList(subjects, getWorksView) {
+  const count = getColumnCount();
+  const columns = [];
+  for (let i = 0; i < count; i++) {
+    columns.push(createElement("div", "card-column"));
+  }
+  subjects.forEach((subject, index) => {
+    columns[index % count].append(createSubjectCard(subject, getWorksView));
+  });
+
   const list = createElement("div", "card-list");
-  list.append(...subjects.map((subject) => createSubjectCard(subject, getWorksView)));
+  list.style.setProperty("--columns", count);
+  list.append(...columns);
   return list;
 }
 
@@ -1229,6 +1288,9 @@ for (const tab of document.querySelectorAll(".tab")) {
   tab.addEventListener("click", () => selectTab(tab.dataset.tab));
 }
 document.getElementById("settings-button").addEventListener("click", openSettings);
+// Ширина окна изменилась так, что меняется число колонок: раскладываем карточки заново
+TWO_COLUMNS.addEventListener("change", render);
+THREE_COLUMNS.addEventListener("change", render);
 
 // Манифест даёт иконку на главном экране Android и компьютера. При открытии
 // двойным кликом браузер не может его прочитать и пишет ошибку, поэтому там не подключаем
