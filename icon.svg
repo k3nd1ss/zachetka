@@ -1,11 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Дневник студента">
-  <!-- Фон иконки -->
-  <rect width="512" height="512" rx="96" fill="#0f5c63"/>
-  <!-- Зачётка: обложка, корешок и строки заголовка -->
-  <rect x="136" y="104" width="240" height="304" rx="20" fill="#f5f3ee"/>
-  <path d="M156 104h28v304h-28a20 20 0 0 1-20-20V124a20 20 0 0 1 20-20z" fill="#c9c4b6"/>
-  <rect x="212" y="146" width="128" height="20" rx="10" fill="#0f5c63"/>
-  <rect x="212" y="182" width="84" height="20" rx="10" fill="#7fa9ac"/>
-  <!-- Галочка: работа сдана -->
-  <path d="M220 284l44 44 80-96" fill="none" stroke="#0f5c63" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <!-- Сильное размытие: из кругов получается мягкое свечение, как шары на фоне приложения -->
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="60"/>
+    </filter>
+    <!-- Свечение галочки: размытая копия линии под самой линией -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="soft"/>
+      <feMerge>
+        <feMergeNode in="soft"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Свечение не должно вылезать за скруглённые углы -->
+    <clipPath id="shape">
+      <rect width="512" height="512" rx="114"/>
+    </clipPath>
+  </defs>
+
+  <!-- Почти чёрный фон, как у приложения -->
+  <rect width="512" height="512" rx="114" fill="#050507"/>
+
+  <!-- Синее свечение в двух углах -->
+  <g clip-path="url(#shape)" filter="url(#blur)">
+    <circle cx="110" cy="90" r="150" fill="#0a84ff" opacity="0.35"/>
+    <circle cx="440" cy="460" r="130" fill="#0a84ff" opacity="0.18"/>
+  </g>
+
+  <!-- Еле заметная кромка, как край стекла: иконка не теряется на тёмных обоях -->
+  <rect class="rim" x="3" y="3" width="506" height="506" rx="111" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="6"/>
+
+  <!-- Тонкая светящаяся галочка -->
+  <path d="M156 266l70 70 134-162" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
 </svg>

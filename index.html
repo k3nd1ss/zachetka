@@ -28,11 +28,22 @@
     <h1 class="app-title">
       <!-- Значок нарисован прямо здесь, поэтому перекрашивается вместе с оформлением -->
       <svg class="app-logo" viewBox="0 0 512 512" aria-hidden="true">
-        <rect class="logo-back" x="10" y="10" width="492" height="492" rx="112"/>
-        <rect x="136" y="104" width="240" height="304" rx="20" fill="#f5f3ee"/>
-        <path d="M156 104h28v304h-28a20 20 0 0 1-20-20V124a20 20 0 0 1 20-20z" fill="#c9c4b6"/>
-        <rect class="logo-line" x="212" y="146" width="128" height="20" rx="10"/>
-        <path class="logo-check" d="M220 284l44 44 80-96"/>
+        <defs>
+          <filter id="logo-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="60"/>
+          </filter>
+          <clipPath id="logo-shape">
+            <rect width="512" height="512" rx="114"/>
+          </clipPath>
+        </defs>
+        <!-- Как иконка приложения: чёрная плитка, свечение в цвете оформления и белая галочка -->
+        <rect width="512" height="512" rx="114" fill="#050507"/>
+        <g clip-path="url(#logo-shape)" filter="url(#logo-blur)">
+          <circle class="logo-orb" cx="110" cy="90" r="150" opacity="0.55"/>
+          <circle class="logo-orb" cx="440" cy="460" r="130" opacity="0.3"/>
+        </g>
+        <rect x="7" y="7" width="498" height="498" rx="107" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="14"/>
+        <path class="logo-check" d="M156 266l70 70 134-162"/>
       </svg>
       <span>Дневник студента</span>
     </h1>

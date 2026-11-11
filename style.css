@@ -22,7 +22,6 @@
   --accent-text: #5cb8c0;
   --accent-bar: #3a9aa3;
   --on-accent: #ffffff;
-  --logo-mark: #0f5c63;
   --orb-light: #0a3c40;
   --orb-dark: #031213;
   --orb-rim: #6fa4a8;
@@ -151,19 +150,14 @@ p {
   height: 28px;
 }
 
-.logo-back {
+.logo-orb {
   fill: var(--accent);
-  stroke: rgba(255, 255, 255, 0.2);
-  stroke-width: 14;
 }
 
-.logo-line {
-  fill: var(--logo-mark);
-}
-
+/* Линия толще, чем на большой иконке: в 28 пикселях тонкая галочка пропала бы */
 .logo-check {
   fill: none;
-  stroke: var(--logo-mark);
+  stroke: #ffffff;
   stroke-width: 36;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -800,6 +794,11 @@ select.input,
 
 .profile-card-text {
   min-width: 0;
+}
+
+/* Аватар и текст стоят в одну строку, поэтому линия-разделитель группы здесь не нужна */
+.profile-card > * + * {
+  border-top: none;
 }
 
 /* ===== Окна ===== */

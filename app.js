@@ -765,9 +765,8 @@ function getTextColorOn(background) {
   return getContrast(background, "#ffffff") >= getContrast(background, "#000000") ? "#ffffff" : "#000000";
 }
 
-// Цвет групп в тёмной теме и «бумаги» на значке: по ним проверяется контраст
+// Цвет групп в тёмной теме: по нему проверяется контраст подписей
 const SURFACE_COLOR = "#2c2c2e";
-const PAPER_COLOR = "#f5f3ee";
 
 // Меняет цвет, пока контраст с фоном не станет не меньше нужного:
 // на тёмном фоне осветляет, на светлом — затемняет.
@@ -791,8 +790,6 @@ function applyTheme() {
   rootStyle.setProperty("--accent-text", getReadableColor(color, SURFACE_COLOR, 4.5));
   // Полоске прогресса хватает контраста 3:1, поэтому она ближе к выбранному цвету
   rootStyle.setProperty("--accent-bar", getReadableColor(color, SURFACE_COLOR, 3));
-  // Значок в шапке нарисован на светлой «бумаге»
-  rootStyle.setProperty("--logo-mark", getReadableColor(color, PAPER_COLOR, 3));
   // Шары на фоне: оттенок выбранного цвета, но с одинаковой яркостью для любого цвета.
   // Иначе тёмно-синие шары были бы не видны, а жёлтые — слишком яркими
   const { h, s } = hexToHsl(color);
