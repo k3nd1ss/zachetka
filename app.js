@@ -311,47 +311,143 @@ function createSemesterField(labelText, input) {
   return field;
 }
 
-/* ===== 6. Модальные окна ===== */
+/* ===== 6. Окна: шторка снизу и окно-предупреждение ===== */
 
 const modal = document.getElementById("modal");
+const SVG_NS = "http://www.w3.org/2000/svg";
 
-function openModal(title, ...children) {
-  modal.replaceChildren(createElement("h2", "modal-title", title), ...children);
+// Шрифт как в style.css: нужен, чтобы измерить ширину текста
+const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+// Значки из линий. Рисуются цветом текста, поэтому перекрашиваются сами
+const ICON_PATHS = {
+  plus: "M12 5v14M5 12h14",
+  chevron: "M9 6l6 6-6 6",
+};
+
+function createIcon(name) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("icon");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", ICON_PATHS[name]);
+  svg.append(path);
+  return svg;
+}
+
+// Группа строк со скруглёнными углами, как в настройках iPhone
+function createGroup(...children) {
+  const group = createElement("div", "group");
+  group.append(...children);
+  return group;
+}
+
+// Подпись над группой мелкими заглавными буквами
+function createSectionHeader(text) {
+  return createElement("h3", "section-header", text);
+}
+
+// Пояснение под группой
+function createFootnote(text) {
+  return createElement("p", "footnote", text);
+}
+
+// Строка-кнопка во всю ширину группы: «Добавить работу», «Экспорт в файл»
+function createRowButton(text, onClick, className, icon) {
+  const button = createButton(text, "row-button " + (className || ""), onClick);
+  if (icon) {
+    button.prepend(createIcon(icon));
+  }
+  return button;
+}
+
+function createFormError() {
+  const error = createElement("p", "form-error");
+  error.setAttribute("role", "alert");
+  return error;
+}
+
+// Форма в шторке. Кнопка «Сохранить» стоит в шапке шторки, вне формы,
+// и связана с ней через атрибут form="sheet-form"
+function createSheetForm(onSubmit) {
+  const form = createElement("form", "form");
+  form.id = "sheet-form";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    onSubmit();
+  });
+  return form;
+}
+
+// Шапка шторки: слева «Отмена», в центре заголовок, справа «Сохранить» или «Готово»
+function createSheetHeader(title, submitLabel) {
+  const header = createElement("div", "sheet-header");
+  const heading = createElement("h2", "modal-title", title);
+  if (submitLabel) {
+    const submit = createElement("button", "button text-button text-button-bold", submitLabel);
+    submit.type = "submit";
+    submit.setAttribute("form", "sheet-form");
+    header.append(createButton("Отмена", "text-button", closeModal), heading, submit);
+  } else {
+    header.append(createElement("span"), heading, createButton("Готово", "text-button text-button-bold", closeModal));
+  }
+  return header;
+}
+
+// Показывает окно. variant — «modal-sheet» (шторка) или «modal-alert» (предупреждение)
+function showModal(variant, ...children) {
+  modal.className = "modal " + variant;
+  modal.replaceChildren(...children);
   if (!modal.open) {
     modal.showModal();
   }
+  modal.scrollTop = 0;
+}
+
+// Шторка снизу. submitLabel нужен для форм; без него в шапке будет «Готово»
+function openSheet(title, submitLabel, ...children) {
+  const body = createElement("div", "sheet-body");
+  body.append(...children);
+  showModal("modal-sheet", createElement("div", "sheet-grabber"), createSheetHeader(title, submitLabel), body);
 }
 
 function closeModal() {
   modal.close();
 }
 
+// Нажатие на затемнённый фон мимо шторки закрывает её. Окно-предупреждение так не закрывается
+modal.addEventListener("click", (event) => {
+  const box = modal.getBoundingClientRect();
+  const outside =
+    event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+  if (event.target === modal && outside && modal.classList.contains("modal-sheet")) {
+    closeModal();
+  }
+});
+
+// Окно-предупреждение по центру, как системное на iPhone
+function openAlert(title, text, buttons) {
+  const body = createElement("div", "alert-body");
+  body.append(createElement("h2", "alert-title", title), createElement("p", "alert-text", text));
+  const row = createElement("div", "alert-buttons");
+  row.append(...buttons);
+  showModal("modal-alert", body, row);
+}
+
 // Собственное окно подтверждения вместо стандартного confirm()
 function openConfirm(title, text, confirmLabel, onConfirm) {
-  const actions = createElement("div", "form-actions");
-  actions.append(
-    createButton("Отмена", "", closeModal),
-    createButton(confirmLabel, "button-danger", () => {
+  openAlert(title, text, [
+    createButton("Отмена", "alert-button", closeModal),
+    createButton(confirmLabel, "alert-button alert-danger", () => {
       closeModal();
       onConfirm();
-    })
-  );
-  openModal(title, createElement("p", "modal-text", text), actions);
+    }),
+  ]);
 }
 
 function openInfo(title, text) {
-  const actions = createElement("div", "form-actions");
-  actions.append(createButton("Понятно", "button-primary", closeModal));
-  openModal(title, createElement("p", "modal-text", text), actions);
-}
-
-// Нижняя часть любой формы: «Отмена» и кнопка отправки
-function createFormActions(submitLabel) {
-  const actions = createElement("div", "form-actions");
-  const submit = createElement("button", "button button-primary", submitLabel);
-  submit.type = "submit";
-  actions.append(createButton("Отмена", "", closeModal), submit);
-  return actions;
+  openAlert(title, text, [createButton("Понятно", "alert-button alert-bold", closeModal)]);
 }
 
 /* ===== 7. Форма предмета и долга ===== */
@@ -395,9 +491,8 @@ function openNewDebtForm() {
 // subject = null означает, что создаётся новый предмет
 function openSubjectForm(subject, forDebt) {
   const values = subject || createBlankSubject(forDebt);
-  const form = createElement("form", "form");
-  const error = createElement("p", "form-error");
-  error.setAttribute("role", "alert");
+  const error = createFormError();
+  const form = createSheetForm(() => submitSubjectForm(form, error, subject, forDebt));
 
   const nameInput = createInput("name", "text", values.name);
   nameInput.required = true;
@@ -405,21 +500,23 @@ function openSubjectForm(subject, forDebt) {
   semesterInput.required = true;
 
   form.append(
-    createField("Название", nameInput),
-    createField("Преподаватель", createInput("teacher", "text", values.teacher)),
-    createSemesterField("Номер семестра", semesterInput),
-    createField("Форма контроля", createSelect("control", CONTROL_LABELS, values.control)),
-    createField("Итог по предмету", createSelect("result", RESULT_LABELS, values.result)),
-    error,
-    createFormActions("Сохранить")
+    createGroup(
+      createField("Название", nameInput),
+      createField("Преподаватель", createInput("teacher", "text", values.teacher))
+    ),
+    createGroup(
+      createSemesterField("Номер семестра", semesterInput),
+      createField("Форма контроля", createSelect("control", CONTROL_LABELS, values.control)),
+      createField("Итог по предмету", createSelect("result", RESULT_LABELS, values.result))
+    ),
+    error
   );
+  // Удаление — внизу формы, как в приложениях iPhone
+  if (subject) {
+    form.append(createGroup(createRowButton("Удалить предмет", () => confirmDeleteSubject(subject), "row-danger")));
+  }
 
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    submitSubjectForm(form, error, subject, forDebt);
-  });
-
-  openModal(getSubjectFormTitle(subject, forDebt), form);
+  openSheet(getSubjectFormTitle(subject, forDebt), "Сохранить", form);
 }
 
 function getSubjectFormTitle(subject, forDebt) {
@@ -486,9 +583,8 @@ function confirmDeleteSubject(subject) {
 // work = null означает, что создаётся новая работа
 function openWorkForm(subject, work) {
   const values = work || { type: "lab", title: "", status: "todo", note: "" };
-  const form = createElement("form", "form");
-  const error = createElement("p", "form-error");
-  error.setAttribute("role", "alert");
+  const error = createFormError();
+  const form = createSheetForm(() => submitWorkForm(form, error, subject, work));
 
   const titleInput = createInput("title", "text", values.title);
   titleInput.required = true;
@@ -497,20 +593,19 @@ function openWorkForm(subject, work) {
   noteInput.value = values.note;
 
   form.append(
-    createField("Тип работы", createSelect("type", WORK_TYPE_LABELS, values.type)),
-    createField("Название или номер", titleInput),
-    createField("Статус", createSelect("status", WORK_STATUS_LABELS, values.status)),
-    createField("Заметка (необязательно)", noteInput),
-    error,
-    createFormActions("Сохранить")
+    createGroup(
+      createField("Тип работы", createSelect("type", WORK_TYPE_LABELS, values.type)),
+      createField("Название или номер", titleInput),
+      createField("Статус", createSelect("status", WORK_STATUS_LABELS, values.status))
+    ),
+    createGroup(createField("Заметка (необязательно)", noteInput)),
+    error
   );
+  if (work) {
+    form.append(createGroup(createRowButton("Удалить работу", () => confirmDeleteWork(subject, work), "row-danger")));
+  }
 
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    submitWorkForm(form, error, subject, work);
-  });
-
-  openModal(work ? "Изменить работу" : "Новая работа", form);
+  openSheet(work ? "Изменить работу" : "Новая работа", "Сохранить", form);
 }
 
 function submitWorkForm(form, error, subject, work) {
@@ -616,22 +711,21 @@ function createImportControls(error) {
     }
     input.value = ""; // иначе повторный выбор того же файла не сработает
   });
-  return [input, createButton("Импорт из файла", "", () => input.click())];
+  return [input, createRowButton("Импорт из файла", () => input.click())];
 }
 
 function createBackupSection() {
-  const section = createElement("div", "settings-section");
-  const error = createElement("p", "form-error");
-  error.setAttribute("role", "alert");
-  const buttons = createElement("div", "action-row");
-  buttons.append(createButton("Экспорт в файл", "", exportData), ...createImportControls(error));
-  section.append(
-    createElement("h3", "settings-title", "Резервная копия"),
-    createElement("p", "settings-text", "Данные хранятся только в этом браузере. Файл защитит их от потери и поможет перенести на другое устройство."),
-    buttons,
-    error
+  const block = createElement("div", "settings-block");
+  const error = createFormError();
+  const [input, importButton] = createImportControls(error);
+  block.append(
+    createSectionHeader("Резервная копия"),
+    createGroup(createRowButton("Экспорт в файл", exportData), importButton),
+    input,
+    error,
+    createFootnote("Данные хранятся только в этом браузере. Файл защитит их от потери и поможет перенести на другое устройство.")
   );
-  return section;
+  return block;
 }
 
 /* ===== 10. Цвет оформления ===== */
@@ -671,12 +765,18 @@ function getTextColorOn(background) {
   return getContrast(background, "#ffffff") >= getContrast(background, "#000000") ? "#ffffff" : "#000000";
 }
 
-// Затемняет цвет, пока текст этого цвета не станет читаемым на фоне.
-// Без этого жёлтый или белый цвет сделал бы подписи невидимыми
-function getReadableColor(color, background) {
+// Цвет групп в тёмной теме и «бумаги» на значке: по ним проверяется контраст
+const SURFACE_COLOR = "#2c2c2e";
+const PAPER_COLOR = "#f5f3ee";
+
+// Меняет цвет, пока контраст с фоном не станет не меньше нужного:
+// на тёмном фоне осветляет, на светлом — затемняет.
+// Без этого тёмно-синий или чёрный цвет сделал бы подписи невидимыми
+function getReadableColor(color, background, minContrast) {
+  const target = getLuminance(background) < 0.2 ? "#ffffff" : "#000000";
   let result = color;
-  for (let share = 0.1; share <= 1 && getContrast(result, background) < 4.5; share += 0.1) {
-    result = mixColors(color, "#000000", share);
+  for (let share = 0.05; share <= 1 && getContrast(result, background) < minContrast; share += 0.05) {
+    result = mixColors(color, target, share);
   }
   return result;
 }
@@ -684,15 +784,22 @@ function getReadableColor(color, background) {
 // Передаёт выбранный цвет в переменные CSS: весь интерфейс перекрашивается сам
 function applyTheme() {
   const color = data.accentColor;
-  const soft = mixColors(color, "#ffffff", 0.85);
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty("--accent", color);
-  rootStyle.setProperty("--accent-soft", soft);
-  rootStyle.setProperty("--accent-text", getReadableColor(color, soft));
   rootStyle.setProperty("--on-accent", getTextColorOn(color));
-  // Очень светлая полоска (белая, салатовая) сольётся с фоном, поэтому берём затемнённый цвет
-  rootStyle.setProperty("--accent-bar", getLuminance(color) > 0.7 ? getReadableColor(color, soft) : color);
-  document.querySelector('meta[name="theme-color"]').content = color;
+  // Подписи и значки цвета оформления: читаются на тёмных группах при любом цвете
+  rootStyle.setProperty("--accent-text", getReadableColor(color, SURFACE_COLOR, 4.5));
+  // Полоске прогресса хватает контраста 3:1, поэтому она ближе к выбранному цвету
+  rootStyle.setProperty("--accent-bar", getReadableColor(color, SURFACE_COLOR, 3));
+  // Значок в шапке нарисован на светлой «бумаге»
+  rootStyle.setProperty("--logo-mark", getReadableColor(color, PAPER_COLOR, 3));
+  // Шары на фоне: оттенок выбранного цвета, но с одинаковой яркостью для любого цвета.
+  // Иначе тёмно-синие шары были бы не видны, а жёлтые — слишком яркими
+  const { h, s } = hexToHsl(color);
+  const saturation = Math.min(s, 70);
+  rootStyle.setProperty("--orb-light", hslToHex(h, saturation, 30));
+  rootStyle.setProperty("--orb-dark", hslToHex(h, saturation, 9));
+  rootStyle.setProperty("--orb-rim", hslToHex(h, Math.min(s, 60), 72));
 }
 
 // Переводит цвет из #rrggbb в оттенок, насыщенность и светлоту (HSL)
@@ -866,11 +973,9 @@ function createCustomToggle(panel) {
   toggle.type = "button";
   toggle.setAttribute("aria-expanded", String(!panel.hidden));
   toggle.setAttribute("aria-controls", panel.id);
-  toggle.append(
-    createElement("span", "custom-dot"),
-    createElement("span", "custom-label", "Свой цвет"),
-    createElement("span", "card-chevron")
-  );
+  const chevron = createElement("span", "card-chevron");
+  chevron.append(createIcon("chevron"));
+  toggle.append(createElement("span", "custom-dot"), createElement("span", "custom-label", "Свой цвет"), chevron);
   toggle.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
     toggle.setAttribute("aria-expanded", String(!panel.hidden));
@@ -879,17 +984,16 @@ function createCustomToggle(panel) {
 }
 
 function createColorSection() {
-  const section = createElement("div", "settings-section");
+  const block = createElement("div", "settings-block");
   const swatches = createElement("div", "swatches");
   swatches.append(...ACCENT_COLORS.map(createSwatch));
   const panel = createCustomPanel();
-  section.append(
-    createElement("h3", "settings-title", "Цвет оформления"),
-    swatches,
-    createCustomToggle(panel),
-    panel
+  block.append(
+    createSectionHeader("Цвет оформления"),
+    createGroup(swatches, createCustomToggle(panel), panel),
+    createFootnote("Фон и кнопки перекрашиваются сразу.")
   );
-  return section;
+  return block;
 }
 
 // Заполняет панель цвета: это можно сделать, только когда она уже на странице
@@ -901,36 +1005,28 @@ function initColorSection() {
 
 /* ===== 11. Настройки ===== */
 
-function openSettings() {
-  const form = createElement("form", "form");
-  const error = createElement("p", "form-error");
-  error.setAttribute("role", "alert");
-  const semester = data.currentSemester === null ? "" : data.currentSemester;
-
-  form.append(
-    createSemesterField("Текущий семестр", createNumberInput("currentSemester", semester)),
-    error,
-    createFormActions("Сохранить")
-  );
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    submitSettings(form, error);
-  });
-
-  openModal("Настройки", form, createColorSection(), createBackupSection());
-  initColorSection();
-}
-
-function submitSettings(form, error) {
-  const value = new FormData(form).get("currentSemester");
-  const semester = toSemester(value);
-  if (value !== "" && semester === null) {
+// Семестр сохраняется сразу при вводе, как в настройках iPhone
+function saveSemester(input, error) {
+  const semester = toSemester(input.value);
+  if (input.validity.badInput || (input.value !== "" && semester === null)) {
     error.textContent = "Семестр должен быть целым числом от 1.";
     return;
   }
+  error.textContent = "";
   data.currentSemester = semester;
-  updateAndClose();
+  updateData();
+}
+
+function openSettings() {
+  const error = createFormError();
+  const input = createNumberInput("currentSemester", data.currentSemester === null ? "" : data.currentSemester);
+  input.addEventListener("input", () => saveSemester(input, error));
+
+  const study = createElement("div", "settings-block");
+  study.append(createSectionHeader("Учёба"), createGroup(createSemesterField("Текущий семестр", input)), error);
+
+  openSheet("Настройки", null, study, createColorSection(), createBackupSection());
+  initColorSection();
 }
 
 /* ===== 12. Вывод на экран ===== */
@@ -959,12 +1055,13 @@ function createSubjectMeta(subject) {
 }
 
 function createProgress(subject) {
+  const wrapper = createElement("div", "progress");
   if (subject.works.length === 0) {
-    return createElement("p", "progress-text", "Работ пока нет");
+    wrapper.append(createElement("p", "progress-text", "Работ пока нет"));
+    return wrapper;
   }
   const submitted = countSubmitted(subject);
   const percent = Math.round((submitted / subject.works.length) * 100);
-  const wrapper = createElement("div");
   const track = createElement("div", "progress-track");
   const bar = createElement("div", "progress-bar");
   bar.style.width = percent + "%";
@@ -976,33 +1073,41 @@ function createProgress(subject) {
   return wrapper;
 }
 
+// Выпадающий список обычно шириной с самый длинный вариант.
+// Подгоняем ширину под выбранный текст, чтобы статус помещался рядом с названием
+const measureContext = document.createElement("canvas").getContext("2d");
+
+function fitSelectWidth(select, font) {
+  measureContext.font = font;
+  const textWidth = measureContext.measureText(select.selectedOptions[0].text).width;
+  select.style.width = Math.ceil(textWidth) + 48 + "px";
+}
+
 function createStatusSelect(work) {
   const select = createSelect("status", WORK_STATUS_LABELS, work.status);
   select.id = "status-" + work.id;
-  select.classList.add("status-select", "status-" + work.status);
+  select.className = "status-select status-" + work.status;
   select.setAttribute("aria-label", "Статус работы «" + work.title + "»");
   select.addEventListener("change", () => changeWorkStatus(work, select.value));
+  fitSelectWidth(select, "600 16px " + FONT_FAMILY);
   return select;
 }
 
 function createWorkRow(subject, work) {
   const row = createElement("li", "work");
-  const heading = createElement("div", "work-heading");
-  heading.append(
+  // Нажатие на название открывает форму: там работу можно изменить или удалить
+  const main = createElement("button", "work-main");
+  main.type = "button";
+  main.title = "Изменить работу";
+  main.addEventListener("click", () => openWorkForm(subject, work));
+  main.append(
     createElement("span", "work-title", work.title),
     createElement("span", "work-type", WORK_TYPE_LABELS[work.type])
   );
-  row.append(heading, createStatusSelect(work));
   if (work.note !== "") {
-    row.append(createElement("p", "work-note", work.note));
+    main.append(createElement("span", "work-note", work.note));
   }
-
-  const actions = createElement("div", "action-row");
-  actions.append(
-    createButton("Изменить", "", () => openWorkForm(subject, work)),
-    createButton("Удалить", "button-danger", () => confirmDeleteWork(subject, work))
-  );
-  row.append(actions);
+  row.append(main, createStatusSelect(work));
   return row;
 }
 
@@ -1057,7 +1162,9 @@ function createCardToggle(subject, expanded, locked) {
 
   const text = createElement("span", "card-toggle-text");
   text.append(createElement("span", "card-title", subject.name), createSubjectMeta(subject));
-  toggle.append(text, createElement("span", "card-chevron"));
+  const chevron = createElement("span", "card-chevron");
+  chevron.append(createIcon("chevron"));
+  toggle.append(text, chevron);
 
   const heading = createElement("h3", "card-heading");
   heading.append(toggle);
@@ -1066,17 +1173,14 @@ function createCardToggle(subject, expanded, locked) {
 
 // То, что видно только в развёрнутой карточке
 function createCardDetails(subject, view) {
-  const actions = createElement("div", "action-row");
-  actions.append(
-    createButton("Изменить", "", () => openSubjectForm(subject, false)),
-    createButton("Удалить", "button-danger", () => confirmDeleteSubject(subject))
-  );
-
-  const nodes = [actions];
+  const nodes = [];
   if (view.works.length > 0 || view.emptyText !== "") {
     nodes.push(createWorkList(subject, view.works, view.emptyText));
   }
-  nodes.push(createButton("+ Добавить работу", "button-wide", () => openWorkForm(subject, null)));
+  nodes.push(
+    createRowButton("Добавить работу", () => openWorkForm(subject, null), "", "plus"),
+    createRowButton("Изменить предмет", () => openSubjectForm(subject, false))
+  );
   return nodes;
 }
 
@@ -1086,7 +1190,7 @@ function createSubjectCard(subject, getWorksView) {
   const locked = getWorksView === getSubjectWorksView && isFilterActive();
   const expanded = locked || expandedSubjects.has(subject.id);
 
-  const card = createElement("article", "card");
+  const card = createElement("article", "card group");
   card.append(createCardToggle(subject, expanded, locked), createProgress(subject));
   if (expanded) {
     card.append(...createCardDetails(subject, view));
@@ -1124,6 +1228,20 @@ function createCardList(subjects, getWorksView) {
   return list;
 }
 
+// Заголовок вкладки крупным шрифтом и круглая кнопка «+», как в приложениях iPhone
+function createPageHeader(title, addLabel, onAdd) {
+  const header = createElement("div", "page-header");
+  header.append(createElement("h2", "large-title", title));
+  if (onAdd) {
+    const add = createButton("", "add-button", onAdd);
+    add.setAttribute("aria-label", addLabel);
+    add.title = addLabel;
+    add.append(createIcon("plus"));
+    header.append(add);
+  }
+  return header;
+}
+
 // Фильтр работ: варианты списка — «Все» плюс все статусы или типы
 function createFilterSelect(labelText, filterKey, labels) {
   const select = createSelect(filterKey, { all: "Все", ...labels }, workFilter[filterKey]);
@@ -1131,15 +1249,18 @@ function createFilterSelect(labelText, filterKey, labels) {
     workFilter[filterKey] = select.value;
     render();
   });
-  return createField(labelText, select);
+  fitSelectWidth(select, "17px " + FONT_FAMILY);
+  const field = createField(labelText, select);
+  field.classList.add("field-inline");
+  return field;
 }
 
 function createWorkFilter() {
-  const filter = createElement("div", "filter");
-  filter.append(
+  const filter = createGroup(
     createFilterSelect("Статус работ", "status", WORK_STATUS_LABELS),
     createFilterSelect("Тип работ", "type", WORK_TYPE_LABELS)
   );
+  filter.classList.add("filter");
   return filter;
 }
 
@@ -1150,8 +1271,7 @@ function createFirstRunHint() {
   if (!hasNoSubjects && !hasNoSemester) {
     return null;
   }
-  const hint = createElement("section", "hint");
-  hint.append(createElement("h2", "hint-title", "С чего начать"));
+  const text = createElement("div", "hint-text");
   const list = createElement("ul", "hint-list");
   if (hasNoSubjects) {
     list.append(createElement("li", "", "Добавь первый предмет"));
@@ -1159,9 +1279,15 @@ function createFirstRunHint() {
   if (hasNoSemester) {
     list.append(createElement("li", "", "Укажи текущий семестр"));
   }
-  hint.append(list);
+  text.append(createElement("h2", "hint-title", "С чего начать"), list);
+
+  const hint = createElement("section", "group hint");
+  hint.append(text);
+  if (hasNoSubjects) {
+    hint.append(createRowButton("Добавить предмет", openNewSubjectForm, "", "plus"));
+  }
   if (hasNoSemester) {
-    hint.append(createButton("Указать семестр", "", openSettings));
+    hint.append(createRowButton("Указать семестр", openSettings));
   }
   return hint;
 }
@@ -1183,11 +1309,11 @@ function createClosedBlock(subjects) {
 function renderSubjectsTab() {
   const active = data.subjects.filter(isActive);
   const closed = data.subjects.filter(isClosed);
-  const nodes = [createButton("+ Добавить предмет", "button-primary button-wide", openNewSubjectForm)];
+  const nodes = [createPageHeader("Предметы", "Добавить предмет", openNewSubjectForm)];
   const hint = createFirstRunHint();
 
   if (hint) {
-    nodes.unshift(hint);
+    nodes.push(hint);
   }
   if (data.subjects.length > 0) {
     nodes.push(createWorkFilter());
@@ -1204,7 +1330,7 @@ function renderSubjectsTab() {
 }
 
 function renderDebtsTab() {
-  const nodes = [createButton("+ Добавить долг", "button-primary button-wide", openNewDebtForm)];
+  const nodes = [createPageHeader("Долги", "Добавить долг", openNewDebtForm)];
   const debts = data.subjects.filter(isDebt);
 
   if (data.currentSemester === null) {
@@ -1217,50 +1343,81 @@ function renderDebtsTab() {
   return nodes;
 }
 
+// Инициалы для круга в профиле: «Иванов Иван» → «ИИ»
+function getInitials(fullName) {
+  const words = fullName.trim().split(/\s+/).filter((word) => word !== "");
+  const letters = words.slice(0, 2).map((word) => word[0].toUpperCase()).join("");
+  return letters || "?";
+}
+
+function getProfileName() {
+  return data.profile.fullName.trim() || "Студент";
+}
+
+// Круг с инициалами и имя обновляются прямо во время ввода ФИО
+function updateProfileCard() {
+  const avatar = document.querySelector(".avatar");
+  if (avatar) {
+    avatar.textContent = getInitials(data.profile.fullName);
+    document.querySelector(".profile-name").textContent = getProfileName();
+  }
+}
+
 // Поле профиля сохраняется сразу при вводе, поэтому кнопка «Сохранить» не нужна
 function createProfileField(field) {
   const input = createInput(field.key, "text", data.profile[field.key]);
   input.addEventListener("input", () => {
     data.profile[field.key] = input.value;
     saveData();
+    updateProfileCard();
   });
   return createField(field.label, input);
 }
 
 function getCurrentStudyText() {
   if (data.currentSemester === null) {
-    return "Текущий семестр не указан. Его можно задать в настройках.";
+    return "Семестр не указан. Его можно задать в настройках.";
   }
-  return "Сейчас: " + formatSemester(data.currentSemester);
+  return formatSemester(data.currentSemester);
+}
+
+function createProfileCard() {
+  const avatar = createElement("span", "avatar", getInitials(data.profile.fullName));
+  avatar.setAttribute("aria-hidden", "true");
+  const text = createElement("div", "profile-card-text");
+  text.append(
+    createElement("span", "card-title profile-name", getProfileName()),
+    createElement("span", "card-meta", getCurrentStudyText())
+  );
+  const card = createElement("div", "group profile-card");
+  card.append(avatar, text);
+  return card;
 }
 
 function renderProfileTab() {
-  const card = createElement("section", "card profile");
-  const header = createElement("div");
-  header.append(
-    createElement("h2", "card-title", "Профиль студента"),
-    createElement("p", "card-meta", getCurrentStudyText())
+  const profile = createElement("div", "profile");
+  profile.append(
+    createProfileCard(),
+    createSectionHeader("О себе"),
+    createGroup(...PROFILE_FIELDS.map(createProfileField)),
+    createFootnote("Сохраняется автоматически и хранится только на этом устройстве. Профиль попадает и в файл экспорта, поэтому не выкладывай этот файл в открытый доступ.")
   );
-  card.append(
-    header,
-    ...PROFILE_FIELDS.map(createProfileField),
-    createElement("p", "card-meta", "Сохраняется автоматически и хранится только на этом устройстве. Профиль попадает и в файл экспорта, поэтому не выкладывай этот файл в открытый доступ.")
-  );
-  return [card];
+  return [createPageHeader("Профиль"), profile];
 }
 
 function renderTabs() {
-  const debtCount = data.subjects.filter(isDebt).length;
   for (const tab of document.querySelectorAll(".tab")) {
     if (tab.dataset.tab === currentTab) {
       tab.setAttribute("aria-current", "page");
     } else {
       tab.removeAttribute("aria-current");
     }
-    if (tab.dataset.tab === "debts") {
-      tab.textContent = debtCount > 0 ? "Долги (" + debtCount + ")" : "Долги";
-    }
   }
+  // Красный кружок с числом долгов на вкладке
+  const debtCount = data.subjects.filter(isDebt).length;
+  const badge = document.getElementById("debt-badge");
+  badge.textContent = debtCount;
+  badge.hidden = debtCount === 0;
 }
 
 // Какая функция рисует какую вкладку

@@ -2,39 +2,48 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- viewport-fit=cover: на iPhone страница заходит под «чёлку» и полоску внизу -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Дневник студента</title>
-  <meta name="theme-color" content="#0f5c63">
+  <meta name="theme-color" content="#000000">
+  <meta name="color-scheme" content="dark">
   <!-- Иконка на вкладке браузера -->
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <!-- Иконка на главном экране: для iPhone и iPad, для остальных она указана в манифесте -->
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Дневник">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <!-- Путь относительный: иначе на GitHub Pages стили не загрузятся -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Фон: размытые шары, которые красятся в цвет оформления -->
+  <div class="backdrop" aria-hidden="true">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+  </div>
+
   <header class="app-header">
     <h1 class="app-title">
       <!-- Значок нарисован прямо здесь, поэтому перекрашивается вместе с оформлением -->
       <svg class="app-logo" viewBox="0 0 512 512" aria-hidden="true">
-        <rect class="logo-back" x="10" y="10" width="492" height="492" rx="104"/>
+        <rect class="logo-back" x="10" y="10" width="492" height="492" rx="112"/>
         <rect x="136" y="104" width="240" height="304" rx="20" fill="#f5f3ee"/>
         <path d="M156 104h28v304h-28a20 20 0 0 1-20-20V124a20 20 0 0 1 20-20z" fill="#c9c4b6"/>
         <rect class="logo-line" x="212" y="146" width="128" height="20" rx="10"/>
         <path class="logo-check" d="M220 284l44 44 80-96"/>
       </svg>
-      Дневник студента
+      <span>Дневник студента</span>
     </h1>
 
-    <!-- На телефоне эта панель прижата к низу экрана, на компьютере стоит в шапке -->
-    <nav class="tabs" aria-label="Разделы">
-      <button class="tab" type="button" data-tab="subjects">Предметы</button>
-      <button class="tab" type="button" data-tab="debts">Долги</button>
-      <button class="tab" type="button" data-tab="profile">Профиль</button>
-    </nav>
-
-    <button id="settings-button" class="button" type="button">Настройки</button>
+    <button id="settings-button" class="icon-button" type="button" aria-label="Настройки" title="Настройки">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/>
+        <circle cx="15" cy="7" r="2"/>
+        <circle cx="9" cy="17" r="2"/>
+      </svg>
+    </button>
   </header>
 
   <!-- Предупреждение появляется, только если с хранилищем что-то не так -->
@@ -43,7 +52,33 @@
   <!-- Сюда app.js выводит содержимое открытой вкладки -->
   <main id="content" class="content"></main>
 
-  <!-- Единственное модальное окно: app.js каждый раз наполняет его нужной формой -->
+  <!-- Панель вкладок внизу экрана, как в приложениях iPhone -->
+  <nav class="tabs" aria-label="Разделы">
+    <button class="tab" type="button" data-tab="subjects">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5z"/>
+        <path d="M5 19.5A2.5 2.5 0 0 0 7.5 22H19v-5"/>
+      </svg>
+      <span class="tab-label">Предметы</span>
+    </button>
+    <button class="tab" type="button" data-tab="debts">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 7v5l3 2"/>
+      </svg>
+      <span class="tab-label">Долги</span>
+      <span id="debt-badge" class="tab-badge" hidden></span>
+    </button>
+    <button class="tab" type="button" data-tab="profile">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M4 21a8 8 0 0 1 16 0"/>
+      </svg>
+      <span class="tab-label">Профиль</span>
+    </button>
+  </nav>
+
+  <!-- Единственное окно: app.js показывает в нём шторку с формой или предупреждение -->
   <dialog id="modal" class="modal"></dialog>
 
   <script src="app.js"></script>
