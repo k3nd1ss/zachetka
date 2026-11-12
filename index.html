@@ -13,8 +13,11 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Дневник">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <!-- Путь относительный: иначе на GitHub Pages стили не загрузятся -->
-  <link rel="stylesheet" href="style.css">
+  <!-- Путь относительный: иначе на GitHub Pages стили не загрузятся.
+       ?v=… — номер версии. Браузер хранит файлы в кеше, и после обновления сайта
+       мог бы показать старый style.css. Новый номер — новый адрес, и файл скачается заново.
+       При каждой публикации увеличивай номер здесь и у app.js внизу страницы -->
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
   <!-- Фон: размытые шары, которые красятся в цвет оформления -->
@@ -95,6 +98,7 @@
   <!-- Меню выбора для выпадающих списков: app.js открывает его поверх всего, даже поверх шторки -->
   <dialog id="picker" class="picker" aria-label="Выбор варианта"></dialog>
 
-  <script src="app.js"></script>
+  <!-- Номер версии тот же, что у style.css: файлы обновляются вместе -->
+  <script src="app.js?v=2"></script>
 </body>
 </html>
