@@ -33,6 +33,9 @@ const ACCENT_COLORS = [
 ];
 
 // Поля профиля: код для хранения и подпись на экране
+// Вариант короткий: длинный текст растянул бы строку под названием предмета
+const VARIANT_MAX_LENGTH = 20;
+
 const PROFILE_FIELDS = [
   { key: "fullName", label: "ФИО" },
   { key: "university", label: "Вуз" },
@@ -116,6 +119,12 @@ function toText(value) {
   return typeof value === "string" ? value : "";
 }
 
+// Вариант — любые буквы и цифры: «7», «3Б», «A2».
+// Если написали «Вариант 7», оставляем только «7», иначе в карточке будет «Вариант Вариант 7»
+function toVariant(value) {
+  return toText(value).trim().replace(/^вариант\s*/i, "").slice(0, VARIANT_MAX_LENGTH);
+}
+
 // Возвращает целое число от 1 и больше либо null
 function toSemester(value) {
   const number = Number(value);
@@ -153,6 +162,8 @@ function normalizeSubject(raw) {
     id: createId(),
     name: toText(raw.name).trim() || "Без названия",
     teacher: toText(raw.teacher),
+    // В старых данных варианта нет: тогда он просто пустой
+    variant: toVariant(raw.variant),
     semester: toSemester(raw.semester) || 1,
     control: pickAllowed(raw.control, CONTROL_LABELS, "credit"),
     result: pickAllowed(raw.result, RESULT_LABELS, "none"),
@@ -323,6 +334,7 @@ const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI
 const ICON_PATHS = {
   plus: "M12 5v14M5 12h14",
   chevron: "M9 6l6 6-6 6",
+  check: "M5 12.5l4.5 4.5L19 7",
 };
 
 function createIcon(name) {
@@ -426,6 +438,137 @@ modal.addEventListener("click", (event) => {
   }
 });
 
+/* ===== Своё меню выбора вместо системного ===== */
+// Системное меню выпадающего списка рисует телефон, и на Android оно белое.
+// Поэтому нажатие на список открывает наше меню в стиле приложения.
+// Сам <select> остаётся: он хранит значение, и формы читают его как раньше
+const picker = document.getElementById("picker");
+let pickerSelect = null;
+
+// Список не ловит нажатия (pointer-events: none в style.css),
+// поэтому нажатие получает его родитель: строка формы или «таблетка» статуса
+document.addEventListener("click", (event) => {
+  const host = event.target.closest(".field, .status");
+  const select = host && host.querySelector(":scope > select");
+  if (select) {
+    event.preventDefault();
+    openPicker(select, host);
+  }
+});
+
+// С клавиатуры меню открывается пробелом, Enter или Alt + стрелка вниз
+document.addEventListener("keydown", (event) => {
+  const select = event.target;
+  if (select.tagName !== "SELECT") {
+    return;
+  }
+  if (event.key === " " || event.key === "Enter" || (event.altKey && event.key === "ArrowDown")) {
+    event.preventDefault();
+    openPicker(select, select.parentElement);
+  }
+});
+
+function openPicker(select, anchor) {
+  pickerSelect = select;
+  const menu = createElement("div", "picker-menu");
+  menu.setAttribute("role", "menu");
+  for (const option of select.options) {
+    menu.append(createPickerOption(select, option));
+  }
+  picker.replaceChildren(menu);
+  picker.showModal();
+  placePicker(anchor.getBoundingClientRect());
+  // Фокус на выбранный пункт: с клавиатуры можно сразу листать стрелками
+  const current = menu.querySelector('[aria-checked="true"]');
+  if (current) {
+    current.focus({ preventScroll: true });
+  }
+}
+
+function createPickerOption(select, option) {
+  const item = createElement("button", "picker-option");
+  item.type = "button";
+  item.setAttribute("role", "menuitemradio");
+  const isCurrent = option.value === select.value;
+  item.setAttribute("aria-checked", String(isCurrent));
+  // Галочка слева у выбранного пункта, как в меню iPhone
+  const mark = createIcon("check");
+  mark.classList.add("picker-check");
+  item.append(mark, createElement("span", "picker-text", option.text));
+  item.addEventListener("click", () => choosePickerOption(select, option.value));
+  return item;
+}
+
+function choosePickerOption(select, value) {
+  closePicker();
+  if (select.value !== value) {
+    select.value = value;
+    // Сообщаем об изменении так же, как это делает обычный список
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+// Меню появляется под списком, а если внизу не хватает места — над ним.
+// По горизонтали оно выровнено по правому краю списка и не вылезает за экран
+function placePicker(anchorBox) {
+  const margin = 8;
+  // offsetWidth, а не getBoundingClientRect: в первый кадр анимации меню уменьшено,
+  // и размер с учётом анимации оказался бы меньше настоящего
+  const box = { width: picker.offsetWidth, height: picker.offsetHeight };
+  let left = Math.min(anchorBox.right - box.width, window.innerWidth - box.width - margin);
+  left = Math.max(margin, left);
+  // Нижняя граница — панель вкладок: меню не должно её закрывать.
+  // Когда открыта шторка, панель и так под ней, и граница — низ экрана
+  const tabs = document.querySelector(".tabs");
+  const bottom = modal.open ? window.innerHeight : Math.min(window.innerHeight, tabs.getBoundingClientRect().top);
+  let top = anchorBox.bottom + 6;
+  if (top + box.height > bottom - margin) {
+    top = anchorBox.top - box.height - 6;
+  }
+  // В любом случае меню остаётся целиком на экране
+  top = Math.max(margin, Math.min(top, window.innerHeight - box.height - margin));
+  picker.style.left = left + "px";
+  picker.style.top = top + "px";
+  // Анимация «раскрытия» идёт от той стороны, где список
+  picker.classList.toggle("picker-above", top < anchorBox.top);
+}
+
+function closePicker() {
+  if (picker.open) {
+    picker.close();
+  }
+}
+
+// После закрытия возвращаем фокус на список, если он ещё на экране
+picker.addEventListener("close", () => {
+  if (pickerSelect && pickerSelect.isConnected) {
+    pickerSelect.focus({ preventScroll: true });
+  }
+  pickerSelect = null;
+});
+
+// Нажатие мимо меню закрывает его
+picker.addEventListener("click", (event) => {
+  if (event.target === picker) {
+    closePicker();
+  }
+});
+
+// Стрелки вверх и вниз переходят между пунктами меню
+picker.addEventListener("keydown", (event) => {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+    return;
+  }
+  event.preventDefault();
+  const items = [...picker.querySelectorAll(".picker-option")];
+  const index = items.indexOf(document.activeElement);
+  const step = event.key === "ArrowDown" ? 1 : -1;
+  items[(index + step + items.length) % items.length].focus();
+});
+
+// При повороте экрана меню оказалось бы не на месте, поэтому закрываем его
+window.addEventListener("resize", closePicker);
+
 // Окно-предупреждение по центру, как системное на iPhone
 function openAlert(title, text, buttons) {
   const body = createElement("div", "alert-body");
@@ -463,6 +606,7 @@ function createBlankSubject(forDebt) {
   return {
     name: "",
     teacher: "",
+    variant: "",
     semester: getDefaultSemester(forDebt),
     control: "credit",
     result: "none",
@@ -498,11 +642,17 @@ function openSubjectForm(subject, forDebt) {
   nameInput.required = true;
   const semesterInput = createNumberInput("semester", values.semester);
   semesterInput.required = true;
+  // Обычное текстовое поле: в варианте бывают и буквы, и цифры
+  const variantInput = createInput("variant", "text", values.variant);
+  variantInput.maxLength = VARIANT_MAX_LENGTH;
+  variantInput.placeholder = "Например, 7 или 3Б";
+  variantInput.autocapitalize = "characters";
 
   form.append(
     createGroup(
       createField("Название", nameInput),
-      createField("Преподаватель", createInput("teacher", "text", values.teacher))
+      createField("Преподаватель", createInput("teacher", "text", values.teacher)),
+      createField("Вариант", variantInput)
     ),
     createGroup(
       createSemesterField("Номер семестра", semesterInput),
@@ -545,6 +695,7 @@ function submitSubjectForm(form, error, subject, forDebt) {
   const values = {
     name: fields.get("name").trim(),
     teacher: fields.get("teacher").trim(),
+    variant: toVariant(fields.get("variant")),
     semester: toSemester(fields.get("semester")),
     control: fields.get("control"),
     result: fields.get("result"),
@@ -1045,6 +1196,9 @@ function createSubjectMeta(subject) {
     CONTROL_LABELS[subject.control],
     "Итог: " + RESULT_LABELS[subject.result],
   ];
+  if (subject.variant !== "") {
+    parts.unshift("Вариант " + subject.variant);
+  }
   if (subject.teacher !== "") {
     parts.unshift(subject.teacher);
   }
@@ -1080,14 +1234,22 @@ function fitSelectWidth(select, font) {
   select.style.width = Math.ceil(textWidth) + 48 + "px";
 }
 
+// Текст внутри обычного выпадающего списка не переносится на вторую строку,
+// поэтому длинный статус не помещался рядом с названием.
+// Решение: «таблетка» — это обычный текст, а прозрачный список лежит поверх неё.
+// Нажатие попадает в список, и телефон открывает привычный выбор статуса
 function createStatusSelect(work) {
   const select = createSelect("status", WORK_STATUS_LABELS, work.status);
   select.id = "status-" + work.id;
-  select.className = "status-select status-" + work.status;
+  select.className = "status-select";
   select.setAttribute("aria-label", "Статус работы «" + work.title + "»");
   select.addEventListener("change", () => changeWorkStatus(work, select.value));
-  fitSelectWidth(select, "600 16px " + FONT_FAMILY);
-  return select;
+
+  const pill = createElement("span", "status status-" + work.status);
+  // Неразрывный пробел перед тире: тире не переносится в начало второй строки
+  const text = WORK_STATUS_LABELS[work.status].replace(" —", " —");
+  pill.append(createElement("span", "status-label", text), select);
+  return pill;
 }
 
 function createWorkRow(subject, work) {

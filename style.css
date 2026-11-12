@@ -408,7 +408,7 @@ p {
 .custom-toggle:focus-visible,
 .closed-summary:focus-visible,
 .input:focus-visible,
-.status-select:focus-visible {
+.status:has(.status-select:focus-visible) {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
@@ -438,7 +438,7 @@ textarea.input {
 
 /* Свой значок-стрелка у выпадающих списков */
 select.input,
-.status-select {
+.status {
   padding-right: 34px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ebebf5' stroke-opacity='.64' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-position: right 10px center;
@@ -652,17 +652,47 @@ select.input,
 }
 
 /* Статус: цветная «таблетка», текст тоже разный */
-.status-select {
+.status {
+  position: relative;
+  display: flex;
   flex: none;
+  align-items: center;
   max-width: 100%;
   margin-left: auto;
   min-height: 44px;
   padding: 8px 32px 8px 12px;
-  border: 0;
   border-radius: 10px;
-  font: inherit;
   font-size: 16px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Прозрачный список поверх «таблетки»: его не видно, но нажатие попадает в него.
+   Шрифт 16px нужен, чтобы iPhone не увеличивал страницу при выборе */
+.status-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+  font-size: 16px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Самый длинный статус: шрифт меньше, текст в две строки,
+   чтобы «таблетка» стала узкой и встала справа от названия */
+.status-rejected {
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.status-rejected .status-label {
+  max-width: 9.2em;
+  text-wrap: balance;
 }
 
 .status-todo {
@@ -876,6 +906,99 @@ select.input,
   padding: 8px 16px calc(28px + env(safe-area-inset-bottom));
 }
 
+/* ===== Своё меню выбора вместо системного ===== */
+
+/* Нажатие на список ловит его строка или «таблетка», а app.js открывает своё меню */
+select {
+  pointer-events: none;
+}
+
+.field:has(> select),
+.status {
+  cursor: pointer;
+}
+
+.picker {
+  position: fixed;
+  inset: auto;
+  width: max-content;
+  min-width: 200px;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 14px;
+  /* Почти непрозрачный фон: если браузер не умеет размывать, текст под меню всё равно не просвечивает */
+  background: rgba(40, 40, 42, 0.96);
+  color: var(--label);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
+  transform-origin: top right;
+  animation: picker-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.picker.picker-above {
+  transform-origin: bottom right;
+}
+
+/* Фон под меню не затемняем: меню маленькое, как на iPhone */
+.picker::backdrop {
+  background: transparent;
+}
+
+@keyframes picker-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.picker-menu {
+  display: grid;
+}
+
+.picker-option {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px 10px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.picker-option + .picker-option {
+  border-top: 0.5px solid var(--separator);
+}
+
+.picker-option:active,
+.picker-option:focus-visible {
+  background-color: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+/* Галочка видна только у выбранного пункта, место под неё есть у всех: текст не прыгает */
+.picker-check {
+  width: 18px;
+  height: 18px;
+  color: var(--accent-text);
+  stroke-width: 2.5;
+  visibility: hidden;
+}
+
+.picker-option[aria-checked="true"] .picker-check {
+  visibility: visible;
+}
+
 /* Окно-предупреждение по центру экрана */
 .modal-alert {
   width: 280px;
@@ -937,7 +1060,8 @@ select.input,
 
 @media (prefers-reduced-motion: reduce) {
   .modal-sheet,
-  .modal-alert {
+  .modal-alert,
+  .picker {
     animation: none;
   }
 }
@@ -1131,13 +1255,18 @@ select.input,
     font-size: 16px;
   }
 
-  /* Чтобы самый длинный статус «Пробовал сдать — не приняли» помещался целиком */
+  /* На самых узких экранах строке работы нужно чуть больше места */
   .work {
     padding-right: 12px;
     padding-left: 12px;
   }
 
-  .status-select {
+  /* Иначе «Сделана, не сдана» не помещается справа и уходит на отдельную строку */
+  .work-main {
+    flex-basis: 80px;
+  }
+
+  .status {
     padding-right: 26px;
     padding-left: 10px;
     background-position: right 8px center;
