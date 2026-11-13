@@ -308,8 +308,17 @@ function createField(labelText, control) {
   return field;
 }
 
-// Поле семестра: под ним сразу видно, какой это курс
-function createSemesterField(labelText, input) {
+// Компактная строка формы: подпись слева, поле справа, как в «Контактах» iPhone.
+// Так форма предмета целиком помещается на экран и не нужно её прокручивать
+function createRowField(labelText, control) {
+  const field = createElement("label", "field field-row");
+  field.append(createElement("span", "field-label", labelText), control);
+  return field;
+}
+
+// Поле семестра: рядом сразу видно, какой это курс.
+// row = true — компактная строка для формы предмета
+function createSemesterField(labelText, input, row) {
   const hint = createElement("span", "field-hint");
   const updateHint = () => {
     const semester = toSemester(input.value);
@@ -317,7 +326,7 @@ function createSemesterField(labelText, input) {
   };
   input.addEventListener("input", updateHint);
   updateHint();
-  const field = createField(labelText, input);
+  const field = row ? createRowField(labelText, input) : createField(labelText, input);
   field.append(hint);
   return field;
 }
@@ -409,12 +418,43 @@ function createSheetHeader(title, submitLabel) {
 
 // Показывает окно. variant — «modal-sheet» (шторка) или «modal-alert» (предупреждение)
 function showModal(variant, ...children) {
+  // Если окно как раз закрывается с анимацией, отменяем закрытие и показываем новое содержимое
+  cancelClosing(modal);
   modal.className = "modal " + variant;
   modal.replaceChildren(...children);
   if (!modal.open) {
     modal.showModal();
   }
   modal.scrollTop = 0;
+}
+
+// Пользователь попросил меньше движения в настройках телефона — тогда закрываем без анимации
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+// Закрывает окно не сразу: сначала CSS проигрывает анимацию ухода (класс is-closing),
+// и только потом окно закрывается по-настоящему
+function closeWithAnimation(dialog, duration) {
+  if (!dialog.open || dialog.closeTimer) {
+    return;
+  }
+  if (REDUCED_MOTION.matches) {
+    dialog.close();
+    return;
+  }
+  dialog.classList.add("is-closing");
+  dialog.closeTimer = setTimeout(() => {
+    dialog.closeTimer = null;
+    dialog.classList.remove("is-closing");
+    dialog.close();
+  }, duration);
+}
+
+function cancelClosing(dialog) {
+  if (dialog.closeTimer) {
+    clearTimeout(dialog.closeTimer);
+    dialog.closeTimer = null;
+    dialog.classList.remove("is-closing");
+  }
 }
 
 // Шторка снизу. submitLabel нужен для форм; без него в шапке будет «Готово»
@@ -425,8 +465,14 @@ function openSheet(title, submitLabel, ...children) {
 }
 
 function closeModal() {
-  modal.close();
+  closeWithAnimation(modal, 220);
 }
+
+// Клавиша Escape тоже закрывает окно с анимацией, а не мгновенно
+modal.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeModal();
+});
 
 // Нажатие на затемнённый фон мимо шторки закрывает её. Окно-предупреждение так не закрывается
 modal.addEventListener("click", (event) => {
@@ -469,6 +515,11 @@ document.addEventListener("keydown", (event) => {
 });
 
 function openPicker(select, anchor) {
+  // Прошлое меню ещё доигрывает анимацию закрытия: закрываем его сразу
+  if (picker.closeTimer) {
+    cancelClosing(picker);
+    picker.close();
+  }
   pickerSelect = select;
   const menu = createElement("div", "picker-menu");
   menu.setAttribute("role", "menu");
@@ -534,10 +585,13 @@ function placePicker(anchorBox) {
 }
 
 function closePicker() {
-  if (picker.open) {
-    picker.close();
-  }
+  closeWithAnimation(picker, 140);
 }
+
+picker.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closePicker();
+});
 
 // После закрытия возвращаем фокус на список, если он ещё на экране
 picker.addEventListener("close", () => {
@@ -646,18 +700,19 @@ function openSubjectForm(subject, forDebt) {
   const variantInput = createInput("variant", "text", values.variant);
   variantInput.maxLength = VARIANT_MAX_LENGTH;
   variantInput.placeholder = "Например, 7 или 3Б";
-  variantInput.autocapitalize = "characters";
+  // Клавиатура не включает заглавные буквы сама: вариант пишется так, как его ввели
+  variantInput.autocapitalize = "off";
 
   form.append(
     createGroup(
-      createField("Название", nameInput),
-      createField("Преподаватель", createInput("teacher", "text", values.teacher)),
-      createField("Вариант", variantInput)
+      createRowField("Название", nameInput),
+      createRowField("Преподаватель", createInput("teacher", "text", values.teacher)),
+      createRowField("Вариант", variantInput)
     ),
     createGroup(
-      createSemesterField("Номер семестра", semesterInput),
-      createField("Форма контроля", createSelect("control", CONTROL_LABELS, values.control)),
-      createField("Итог по предмету", createSelect("result", RESULT_LABELS, values.result))
+      createSemesterField("Семестр", semesterInput, true),
+      createRowField("Контроль", createSelect("control", CONTROL_LABELS, values.control)),
+      createRowField("Итог", createSelect("result", RESULT_LABELS, values.result))
     ),
     error
   );
@@ -739,17 +794,19 @@ function openWorkForm(subject, work) {
 
   const titleInput = createInput("title", "text", values.title);
   titleInput.required = true;
+  titleInput.placeholder = "Номер или название";
   const noteInput = createElement("textarea", "input");
   noteInput.name = "note";
   noteInput.value = values.note;
+  noteInput.placeholder = "Необязательно";
 
   form.append(
     createGroup(
-      createField("Тип работы", createSelect("type", WORK_TYPE_LABELS, values.type)),
-      createField("Название или номер", titleInput),
-      createField("Статус", createSelect("status", WORK_STATUS_LABELS, values.status))
+      createRowField("Тип", createSelect("type", WORK_TYPE_LABELS, values.type)),
+      createRowField("Название", titleInput),
+      createRowField("Статус", createSelect("status", WORK_STATUS_LABELS, values.status))
     ),
-    createGroup(createField("Заметка (необязательно)", noteInput)),
+    createGroup(createField("Заметка", noteInput)),
     error
   );
   if (work) {
@@ -1298,16 +1355,21 @@ function isFilterActive() {
   return workFilter.status !== "all" || workFilter.type !== "all";
 }
 
-// Разворачивает или сворачивает карточку
-function toggleSubject(subject) {
-  if (expandedSubjects.has(subject.id)) {
-    expandedSubjects.delete(subject.id);
-  } else {
+// Разворачивает или сворачивает карточку.
+// Страница не перерисовывается целиком: меняется только класс карточки,
+// и CSS плавно меняет высоту списка работ
+function toggleSubject(subject, toggle) {
+  const expanded = !expandedSubjects.has(subject.id);
+  if (expanded) {
     expandedSubjects.add(subject.id);
+  } else {
+    expandedSubjects.delete(subject.id);
   }
-  render();
-  // После перерисовки возвращаем фокус на ту же карточку
-  document.getElementById("toggle-" + subject.id).focus({ preventScroll: true });
+  const card = toggle.closest(".card");
+  card.classList.toggle("is-expanded", expanded);
+  toggle.setAttribute("aria-expanded", String(expanded));
+  // inert: в свёрнутой карточке работы скрыты и не получают фокус с клавиатуры
+  card.querySelector(".card-details").inert = !expanded;
 }
 
 // Заголовок карточки — большая кнопка: нажатие в любом месте сворачивает и разворачивает
@@ -1317,7 +1379,7 @@ function createCardToggle(subject, expanded, locked) {
   toggle.id = "toggle-" + subject.id;
   toggle.disabled = locked;
   toggle.setAttribute("aria-expanded", String(expanded));
-  toggle.addEventListener("click", () => toggleSubject(subject));
+  toggle.addEventListener("click", () => toggleSubject(subject, toggle));
 
   const text = createElement("span", "card-toggle-text");
   text.append(createElement("span", "card-title", subject.name), createSubjectMeta(subject));
@@ -1349,11 +1411,17 @@ function createSubjectCard(subject, getWorksView) {
   const locked = getWorksView === getSubjectWorksView && isFilterActive();
   const expanded = locked || expandedSubjects.has(subject.id);
 
+  // Работы есть в карточке всегда, а свёрнутая карточка просто прячет их с нулевой высотой.
+  // Внутренняя обёртка нужна для плавной анимации высоты (см. .card-details в style.css)
+  const inner = createElement("div", "card-details-inner");
+  inner.append(...createCardDetails(subject, view));
+  const details = createElement("div", "card-details");
+  details.append(inner);
+  details.inert = !expanded;
+
   const card = createElement("article", "card group");
-  card.append(createCardToggle(subject, expanded, locked), createProgress(subject));
-  if (expanded) {
-    card.append(...createCardDetails(subject, view));
-  }
+  card.classList.toggle("is-expanded", expanded);
+  card.append(createCardToggle(subject, expanded, locked), createProgress(subject), details);
   return card;
 }
 
@@ -1595,9 +1663,18 @@ function render() {
 /* ===== 13. Запуск ===== */
 
 function selectTab(tabName) {
+  if (tabName === currentTab) {
+    return;
+  }
   currentTab = tabName;
   render();
   window.scrollTo(0, 0);
+  // Новая вкладка плавно появляется. Класс снимаем и ставим заново,
+  // а offsetWidth заставляет браузер заметить это, чтобы анимация началась сначала
+  const content = document.getElementById("content");
+  content.classList.remove("tab-enter");
+  void content.offsetWidth;
+  content.classList.add("tab-enter");
 }
 
 for (const tab of document.querySelectorAll(".tab")) {
