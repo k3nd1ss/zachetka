@@ -59,6 +59,7 @@ function createEmptyData() {
   return {
     currentSemester: null,
     accentColor: DEFAULT_ACCENT,
+    avatarSeed: 0,
     profile: normalizeProfile({}),
     subjects: [],
   };
@@ -137,6 +138,8 @@ function normalizeData(raw) {
   return {
     currentSemester: toSemester(raw.currentSemester),
     accentColor: toAccentColor(raw.accentColor),
+    // Номер узора аватара: целое число, в старых данных его нет — тогда 0
+    avatarSeed: Number.isInteger(raw.avatarSeed) && raw.avatarSeed >= 0 ? raw.avatarSeed % 1000000 : 0,
     profile: normalizeProfile(isObject(raw.profile) ? raw.profile : {}),
     subjects: raw.subjects.filter(isObject).map(normalizeSubject),
   };
@@ -834,12 +837,23 @@ function submitWorkForm(form, error, subject, work) {
     return;
   }
 
+  const wasComplete = isSubjectComplete(subject);
+  const becameSubmitted = values.status === "submitted" && (!work || work.status !== "submitted");
   if (work) {
     Object.assign(work, values);
   } else {
     subject.works.push({ id: createId(), ...values });
   }
   updateAndClose();
+  // Работу сдали через форму: конфетти летят из карточки предмета
+  if (becameSubmitted) {
+    const toggle = document.getElementById("toggle-" + subject.id);
+    if (toggle) {
+      const box = toggle.getBoundingClientRect();
+      launchConfetti(box.left + box.width / 2, box.top + box.height / 2, 28);
+    }
+    celebrateIfComplete(subject, wasComplete);
+  }
 }
 
 function confirmDeleteWork(subject, work) {
@@ -850,7 +864,13 @@ function confirmDeleteWork(subject, work) {
 }
 
 // Смена статуса прямо в строке работы
-function changeWorkStatus(work, status) {
+function changeWorkStatus(subject, work, status) {
+  // Место «таблетки» запоминаем до перерисовки: оттуда полетят конфетти
+  const pill = document.getElementById("status-" + work.id).closest(".status");
+  const origin = pill.getBoundingClientRect();
+  const wasComplete = isSubjectComplete(subject);
+  const becameSubmitted = work.status !== "submitted" && status === "submitted";
+
   work.status = status;
   updateData();
   // После перерисовки возвращаем фокус на тот же список, если он остался на экране
@@ -858,6 +878,95 @@ function changeWorkStatus(work, status) {
   if (select) {
     select.focus({ preventScroll: true });
   }
+  if (becameSubmitted) {
+    launchConfetti(origin.left + origin.width / 2, origin.top + origin.height / 2, 28);
+    celebrateIfComplete(subject, wasComplete);
+  }
+}
+
+/* ===== Праздник за сданную работу ===== */
+
+// Все работы предмета сданы
+function isSubjectComplete(subject) {
+  return subject.works.length > 0 && countSubmitted(subject) === subject.works.length;
+}
+
+// Оттенки цвета оформления для конфетти: сам цвет, светлее, темнее и белый
+function getConfettiColors() {
+  const color = data.accentColor;
+  return [color, color, mixColors(color, "#ffffff", 0.35), mixColors(color, "#ffffff", 0.65), mixColors(color, "#000000", 0.2), "#ffffff"];
+}
+
+// Конфетти вылетают из точки (x, y), летят вверх и в стороны и падают.
+// Траектория считается по формуле броска: y = скорость · t + g · t² / 2
+function launchConfetti(x, y, count) {
+  if (REDUCED_MOTION.matches) {
+    return;
+  }
+  const layer = createElement("div", "confetti-layer");
+  document.body.append(layer);
+  const colors = getConfettiColors();
+  const gravity = 1400; // пикселей в секунду за секунду
+  let finished = 0;
+
+  for (let i = 0; i < count; i++) {
+    const piece = createElement("span", "confetti-piece");
+    piece.style.background = colors[i % colors.length];
+    piece.style.left = x + "px";
+    piece.style.top = y + "px";
+    if (Math.random() < 0.4) {
+      piece.classList.add("confetti-round");
+    }
+    layer.append(piece);
+
+    const angle = (-90 + (Math.random() - 0.5) * 130) * (Math.PI / 180);
+    const speed = 260 + Math.random() * 380;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    const spin = (Math.random() - 0.5) * 1440;
+    const time = 1 + Math.random() * 0.5;
+
+    const frames = [];
+    for (let step = 0; step <= 10; step++) {
+      const t = (time * step) / 10;
+      frames.push({
+        transform: "translate(" + vx * t + "px, " + (vy * t + (gravity * t * t) / 2) + "px) rotate(" + spin * (step / 10) + "deg)",
+        opacity: step < 7 ? 1 : 1 - (step - 7) / 3,
+      });
+    }
+    piece.animate(frames, { duration: time * 1000, easing: "linear", fill: "forwards" }).onfinish = () => {
+      finished++;
+      if (finished === count) {
+        layer.remove();
+      }
+    };
+  }
+}
+
+// Сданы все работы предмета: большая галочка поверх карточки и много конфетти
+function celebrateIfComplete(subject, wasComplete) {
+  if (wasComplete || !isSubjectComplete(subject)) {
+    return;
+  }
+  const toggle = document.getElementById("toggle-" + subject.id);
+  if (!toggle) {
+    return;
+  }
+  const card = toggle.closest(".card");
+  const box = card.getBoundingClientRect();
+  launchConfetti(box.left + box.width / 2, box.top + Math.min(box.height / 2, 120), 70);
+  if (REDUCED_MOTION.matches) {
+    return;
+  }
+  const overlay = createElement("div", "card-celebrate");
+  const check = createSvgElement("svg", { viewBox: "0 0 100 100", "aria-hidden": "true" });
+  check.append(
+    createSvgElement("circle", { cx: 50, cy: 50, r: 44, class: "celebrate-circle", pathLength: 100 }),
+    createSvgElement("path", { d: "M30 52l14 14 27-31", class: "celebrate-check", pathLength: 100 })
+  );
+  overlay.append(check);
+  card.append(overlay);
+  setTimeout(() => overlay.remove(), 1600);
 }
 
 /* ===== 9. Экспорт и импорт ===== */
@@ -996,7 +1105,7 @@ function applyTheme() {
   rootStyle.setProperty("--on-accent", getTextColorOn(color));
   // Подписи и значки цвета оформления: читаются на тёмных группах при любом цвете
   rootStyle.setProperty("--accent-text", getReadableColor(color, SURFACE_COLOR, 4.5));
-  // Полоске прогресса хватает контраста 3:1, поэтому она ближе к выбранному цвету
+  // Кольцу прогресса хватает контраста 3:1, поэтому оно ближе к выбранному цвету
   rootStyle.setProperty("--accent-bar", getReadableColor(color, SURFACE_COLOR, 3));
   // Шары на фоне: оттенок выбранного цвета, но с одинаковой яркостью для любого цвета.
   // Иначе тёмно-синие шары были бы не видны, а жёлтые — слишком яркими
@@ -1262,6 +1371,86 @@ function createSubjectMeta(subject) {
   return createElement("span", "card-meta", parts.join(" · "));
 }
 
+/* ===== Кольца прогресса и «докручивающиеся» числа ===== */
+
+// Экран перерисовывается после каждого изменения, и кольца создаются заново.
+// Чтобы кольцо не начинало каждый раз с нуля, запоминаем, сколько оно показывало.
+// Ключ — например «ring-<id предмета>», значение — прошлый процент или число
+const lastShown = new Map();
+
+function getPercent(done, total) {
+  return total === 0 ? 0 : Math.round((done / total) * 100);
+}
+
+// Кольцо как в Apple Watch: серая дорожка и цветная дуга поверх.
+// pathLength = 100 — длина окружности считается равной 100, поэтому
+// «сдвиг штриха» 100 − процент сразу даёт дугу нужной длины
+function createRing(percent, key, className) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("ring", className);
+  svg.classList.toggle("ring-full", percent === 100);
+  svg.classList.toggle("ring-empty", percent === 0);
+
+  const track = document.createElementNS(SVG_NS, "circle");
+  const bar = document.createElementNS(SVG_NS, "circle");
+  for (const circle of [track, bar]) {
+    circle.setAttribute("cx", "50");
+    circle.setAttribute("cy", "50");
+    circle.setAttribute("r", "42");
+  }
+  track.classList.add("ring-track");
+  bar.classList.add("ring-bar");
+  bar.setAttribute("pathLength", "100");
+  bar.style.strokeDashoffset = 100 - percent;
+  svg.append(track, bar);
+
+  // Дуга плавно дорисовывается от прошлого значения до нового
+  const from = lastShown.has(key) ? lastShown.get(key) : 0;
+  lastShown.set(key, percent);
+  if (from !== percent && !REDUCED_MOTION.matches) {
+    bar.animate([{ strokeDashoffset: 100 - from }, { strokeDashoffset: 100 - percent }], {
+      duration: 800,
+      easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+    });
+  }
+  return svg;
+}
+
+// Число, которое при изменении «прокручивается» вверх или вниз, как в счётчике
+function createRollingNumber(value, key) {
+  const number = createElement("span", "rolling-number", String(value));
+  const previous = lastShown.get(key);
+  lastShown.set(key, value);
+  if (previous !== undefined && previous !== value) {
+    number.classList.add(value > previous ? "roll-up" : "roll-down");
+  }
+  return number;
+}
+
+// Процент в центре большого кольца плавно отсчитывается до нового значения
+function countUp(element, from, to, suffix) {
+  if (from === to || REDUCED_MOTION.matches) {
+    element.textContent = to + suffix;
+    return;
+  }
+  // Сразу показываем старое значение: иначе до первого кадра анимации центр кольца был бы пуст
+  element.textContent = from + suffix;
+  const start = performance.now();
+  const duration = 800;
+  const step = (now) => {
+    const progress = Math.min((now - start) / duration, 1);
+    // Сначала быстро, к концу медленнее
+    const eased = 1 - Math.pow(1 - progress, 3);
+    element.textContent = Math.round(from + (to - from) * eased) + suffix;
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  };
+  requestAnimationFrame(step);
+}
+
 function createProgress(subject) {
   const wrapper = createElement("div", "progress");
   if (subject.works.length === 0) {
@@ -1269,15 +1458,17 @@ function createProgress(subject) {
     return wrapper;
   }
   const submitted = countSubmitted(subject);
-  const percent = Math.round((submitted / subject.works.length) * 100);
-  const track = createElement("div", "progress-track");
-  const bar = createElement("div", "progress-bar");
-  bar.style.width = percent + "%";
-  track.append(bar);
-  wrapper.append(
-    track,
-    createElement("p", "progress-text", "Сдано " + submitted + " из " + subject.works.length)
+  const total = subject.works.length;
+  const percent = getPercent(submitted, total);
+
+  const text = createElement("p", "progress-text");
+  text.append(
+    "Сдано ",
+    createRollingNumber(submitted, "done-" + subject.id),
+    " из " + total
   );
+  const percentText = createElement("span", "progress-percent", percent + " %");
+  wrapper.append(createRing(percent, "ring-" + subject.id, "ring-small"), text, percentText);
   return wrapper;
 }
 
@@ -1295,12 +1486,12 @@ function fitSelectWidth(select, font) {
 // поэтому длинный статус не помещался рядом с названием.
 // Решение: «таблетка» — это обычный текст, а прозрачный список лежит поверх неё.
 // Нажатие попадает в список, и телефон открывает привычный выбор статуса
-function createStatusSelect(work) {
+function createStatusSelect(subject, work) {
   const select = createSelect("status", WORK_STATUS_LABELS, work.status);
   select.id = "status-" + work.id;
   select.className = "status-select";
   select.setAttribute("aria-label", "Статус работы «" + work.title + "»");
-  select.addEventListener("change", () => changeWorkStatus(work, select.value));
+  select.addEventListener("change", () => changeWorkStatus(subject, work, select.value));
 
   const pill = createElement("span", "status status-" + work.status);
   // Неразрывный пробел перед тире: тире не переносится в начало второй строки
@@ -1323,7 +1514,7 @@ function createWorkRow(subject, work) {
   if (work.note !== "") {
     main.append(createElement("span", "work-note", work.note));
   }
-  row.append(main, createStatusSelect(work));
+  row.append(main, createStatusSelect(subject, work));
   return row;
 }
 
@@ -1570,24 +1761,147 @@ function renderDebtsTab() {
   return nodes;
 }
 
-// Инициалы для круга в профиле: «Иванов Иван» → «ИИ»
-function getInitials(fullName) {
-  const words = fullName.trim().split(/\s+/).filter((word) => word !== "");
-  const letters = words.slice(0, 2).map((word) => word[0].toUpperCase()).join("");
-  return letters || "?";
+/* ===== Узорный аватар ===== */
+// Узор рисуется из ФИО: одно и то же имя всегда даёт один и тот же узор,
+// а разные имена — разные. Нажатие на аватар меняет «номер узора» (avatarSeed)
+
+// Превращает строку в число (хеш FNV-1a). Похожие строки дают совсем разные числа
+function hashString(text) {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+// Генератор «случайных» чисел от 0 до 1 (mulberry32).
+// Из одного и того же начального числа он всегда выдаёт одну и ту же последовательность
+function createRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let avatarCount = 0; // для уникальных id градиентов внутри SVG
+
+function createSvgElement(tag, attributes) {
+  const element = document.createElementNS(SVG_NS, tag);
+  for (const [name, value] of Object.entries(attributes)) {
+    element.setAttribute(name, value);
+  }
+  return element;
+}
+
+// Одна фигура узора: круг, кольцо, повёрнутый квадрат или треугольник
+function createAvatarShape(random) {
+  const x = 10 + random() * 80;
+  const y = 10 + random() * 80;
+  const size = 22 + random() * 38;
+  const fill = "rgba(255, 255, 255, " + (0.16 + random() * 0.34).toFixed(2) + ")";
+  const kind = Math.floor(random() * 4);
+  if (kind === 0) {
+    return createSvgElement("circle", { cx: x, cy: y, r: size / 2, fill });
+  }
+  if (kind === 1) {
+    return createSvgElement("circle", { cx: x, cy: y, r: size / 2.4, fill: "none", stroke: fill, "stroke-width": 7 });
+  }
+  if (kind === 2) {
+    return createSvgElement("rect", {
+      x: x - size / 2, y: y - size / 2, width: size, height: size, rx: size / 5, fill,
+      transform: "rotate(" + Math.round(random() * 90) + " " + x + " " + y + ")",
+    });
+  }
+  const h = size * 0.9;
+  return createSvgElement("path", {
+    d: "M" + x + " " + (y - h / 2) + "L" + (x + h / 2) + " " + (y + h / 2) + "L" + (x - h / 2) + " " + (y + h / 2) + "Z",
+    fill,
+    transform: "rotate(" + Math.round(random() * 360) + " " + x + " " + y + ")",
+  });
+}
+
+function createAvatarPattern(fullName, seed) {
+  const random = createRandom(hashString(fullName.trim().toLowerCase() + "#" + seed));
+  const id = "avatar-gradient-" + avatarCount++;
+  const hue = Math.round(random() * 360);
+  const hue2 = Math.round(hue + 40 + random() * 100) % 360;
+  const angle = random();
+
+  const svg = createSvgElement("svg", { viewBox: "0 0 100 100", "aria-hidden": "true" });
+  const gradient = createSvgElement("linearGradient", {
+    id, x1: angle, y1: 0, x2: 1 - angle, y2: 1,
+  });
+  gradient.append(
+    createSvgElement("stop", { offset: 0, "stop-color": "hsl(" + hue + " 75% 58%)" }),
+    createSvgElement("stop", { offset: 1, "stop-color": "hsl(" + hue2 + " 70% 38%)" })
+  );
+  const defs = createSvgElement("defs", {});
+  defs.append(gradient);
+  svg.append(defs, createSvgElement("rect", { width: 100, height: 100, fill: "url(#" + id + ")" }));
+  for (let i = 0; i < 3; i++) {
+    svg.append(createAvatarShape(random));
+  }
+  return svg;
 }
 
 function getProfileName() {
   return data.profile.fullName.trim() || "Студент";
 }
 
-// Круг с инициалами и имя обновляются прямо во время ввода ФИО
+// Узор и имя обновляются прямо во время ввода ФИО
 function updateProfileCard() {
   const avatar = document.querySelector(".avatar");
   if (avatar) {
-    avatar.textContent = getInitials(data.profile.fullName);
+    avatar.replaceChildren(createAvatarPattern(data.profile.fullName, data.avatarSeed));
     document.querySelector(".profile-name").textContent = getProfileName();
   }
+}
+
+// Нажатие на аватар — следующий узор, с небольшим поворотом
+function nextAvatarPattern(avatar) {
+  data.avatarSeed = (data.avatarSeed + 1) % 1000000;
+  saveData();
+  avatar.replaceChildren(createAvatarPattern(data.profile.fullName, data.avatarSeed));
+  avatar.classList.remove("avatar-change");
+  void avatar.offsetWidth;
+  avatar.classList.add("avatar-change");
+}
+
+/* ===== Прогресс семестра в профиле ===== */
+
+function createSemesterProgress() {
+  const subjects = data.subjects.filter(isActive);
+  const works = subjects.flatMap((subject) => subject.works);
+  const submitted = works.filter((work) => work.status === "submitted").length;
+  const percent = getPercent(submitted, works.length);
+
+  const ringBox = createElement("div", "big-ring");
+  const value = createElement("span", "big-ring-value");
+  const previous = lastShown.has("semester-percent") ? lastShown.get("semester-percent") : 0;
+  ringBox.append(createRing(percent, "ring-semester", "ring-big"), value);
+  countUp(value, previous, percent, "%");
+  lastShown.set("semester-percent", percent);
+
+  const text = createElement("div", "big-ring-text");
+  if (works.length === 0) {
+    text.append(
+      createElement("span", "card-title", "Работ пока нет"),
+      createElement("span", "card-meta", "Добавь работы в предметы текущего семестра, и здесь появится прогресс.")
+    );
+  } else {
+    text.append(
+      createElement("span", "card-title", percent === 100 ? "Семестр закрыт!" : "Семестр закрыт на " + percent + " %"),
+      createElement("span", "card-meta", "Сдано " + submitted + " из " + works.length + " работ · предметов: " + subjects.length)
+    );
+  }
+  const group = createElement("div", "group semester-progress");
+  group.append(ringBox, text);
+  return group;
 }
 
 // Поле профиля сохраняется сразу при вводе, поэтому кнопка «Сохранить» не нужна
@@ -1609,8 +1923,12 @@ function getCurrentStudyText() {
 }
 
 function createProfileCard() {
-  const avatar = createElement("span", "avatar", getInitials(data.profile.fullName));
-  avatar.setAttribute("aria-hidden", "true");
+  const avatar = createElement("button", "avatar");
+  avatar.type = "button";
+  avatar.setAttribute("aria-label", "Сменить узор аватара");
+  avatar.title = "Сменить узор";
+  avatar.append(createAvatarPattern(data.profile.fullName, data.avatarSeed));
+  avatar.addEventListener("click", () => nextAvatarPattern(avatar));
   const text = createElement("div", "profile-card-text");
   text.append(
     createElement("span", "card-title profile-name", getProfileName()),
@@ -1625,6 +1943,7 @@ function renderProfileTab() {
   const profile = createElement("div", "profile");
   profile.append(
     createProfileCard(),
+    createSemesterProgress(),
     createSectionHeader("О себе"),
     createGroup(...PROFILE_FIELDS.map(createProfileField)),
     createFootnote("Сохраняется автоматически и хранится только на этом устройстве. Профиль попадает и в файл экспорта, поэтому не выкладывай этот файл в открытый доступ.")
@@ -1643,6 +1962,13 @@ function renderTabs() {
   // Красный кружок с числом долгов на вкладке
   const debtCount = data.subjects.filter(isDebt).length;
   const badge = document.getElementById("debt-badge");
+  // Число долгов изменилось: кружок подпрыгивает
+  if (lastShown.has("debts") && lastShown.get("debts") !== debtCount) {
+    badge.classList.remove("badge-bump");
+    void badge.offsetWidth;
+    badge.classList.add("badge-bump");
+  }
+  lastShown.set("debts", debtCount);
   badge.textContent = debtCount;
   badge.hidden = debtCount === 0;
 }
@@ -1697,5 +2023,72 @@ function addManifestLink() {
   document.head.append(link);
 }
 
+/* ===== Живой фон и блик на карточках ===== */
+
+// Фон чуть сдвигается вслед за мышью или наклоном телефона — эффект глубины (параллакс).
+// Новое положение записываем не на каждое событие, а раз в кадр (requestAnimationFrame)
+function setupParallax() {
+  if (REDUCED_MOTION.matches) {
+    return;
+  }
+  const backdrop = document.querySelector(".backdrop");
+  const range = 24; // насколько пикселей фон может сдвинуться
+  let target = { x: 0, y: 0 };
+  let scheduled = false;
+  const apply = () => {
+    scheduled = false;
+    backdrop.style.setProperty("--parallax-x", (target.x * range).toFixed(1) + "px");
+    backdrop.style.setProperty("--parallax-y", (target.y * range).toFixed(1) + "px");
+  };
+  const move = (x, y) => {
+    // x и y от −1 до 1; фон движется в обратную сторону, поэтому минус
+    target = { x: -Math.max(-1, Math.min(1, x)), y: -Math.max(-1, Math.min(1, y)) };
+    if (!scheduled) {
+      scheduled = true;
+      requestAnimationFrame(apply);
+    }
+  };
+
+  if (window.matchMedia("(pointer: fine)").matches) {
+    window.addEventListener("pointermove", (event) => {
+      move((event.clientX / window.innerWidth) * 2 - 1, (event.clientY / window.innerHeight) * 2 - 1);
+    });
+  }
+  // Наклон телефона: gamma — влево-вправо, beta — к себе и от себя.
+  // Начальный наклон считаем «нулём», ведь телефон обычно держат под углом
+  let baseBeta = null;
+  window.addEventListener("deviceorientation", (event) => {
+    if (event.gamma === null || event.beta === null) {
+      return;
+    }
+    if (baseBeta === null) {
+      baseBeta = event.beta;
+    }
+    move(event.gamma / 30, (event.beta - baseBeta) / 30);
+  });
+}
+
+// Блик на стеклянных карточках скользит при прокрутке страницы
+function setupCardShine() {
+  if (REDUCED_MOTION.matches) {
+    return;
+  }
+  let scheduled = false;
+  window.addEventListener("scroll", () => {
+    if (scheduled) {
+      return;
+    }
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      // Блик ходит туда-обратно: значение растёт до 100, затем убывает до 0
+      const phase = (window.scrollY * 0.12) % 200;
+      document.documentElement.style.setProperty("--shine", (phase > 100 ? 200 - phase : phase).toFixed(1));
+    });
+  }, { passive: true });
+}
+
 addManifestLink();
+setupParallax();
+setupCardShine();
 render();

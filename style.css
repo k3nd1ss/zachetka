@@ -79,6 +79,49 @@ p {
   background: #000000;
   filter: blur(24px);
   transform: translateZ(0);
+  /* Сдвиг за мышью или наклоном телефона (параллакс). Значения ставит app.js */
+  translate: var(--parallax-x, 0) var(--parallax-y, 0);
+  transition: translate 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Шары медленно плавают, как в лава-лампе: у каждого свой путь и своя скорость */
+.orb-1 {
+  animation: orb-float-1 46s ease-in-out infinite alternate;
+}
+
+.orb-2 {
+  animation: orb-float-2 58s ease-in-out infinite alternate;
+}
+
+.orb-3 {
+  animation: orb-float-3 52s ease-in-out infinite alternate;
+}
+
+@keyframes orb-float-1 {
+  50% {
+    transform: translate(-9vmax, 7vmax) scale(1.06);
+  }
+  100% {
+    transform: translate(4vmax, 12vmax) scale(0.96);
+  }
+}
+
+@keyframes orb-float-2 {
+  50% {
+    transform: translate(10vmax, -6vmax) scale(0.95);
+  }
+  100% {
+    transform: translate(5vmax, 9vmax) scale(1.05);
+  }
+}
+
+@keyframes orb-float-3 {
+  50% {
+    transform: translate(-7vmax, -10vmax) scale(1.08);
+  }
+  100% {
+    transform: translate(-12vmax, 2vmax) scale(1);
+  }
 }
 
 /* Затемнение к краям, чтобы текст хорошо читался */
@@ -253,6 +296,20 @@ p {
   display: none;
 }
 
+/* Число долгов изменилось — кружок подпрыгивает */
+.badge-bump {
+  animation: badge-bump 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes badge-bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.45) translateY(-3px);
+  }
+}
+
 /* ===== Основная область ===== */
 .content {
   display: grid;
@@ -322,6 +379,35 @@ p {
   overflow: hidden;
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+/* «Стекло» на главном экране: сквозь группы размыто виден цветной фон,
+   как в «Пункте управления» iPhone. В окнах-шторках группы остаются плотными */
+.content .group {
+  position: relative;
+  background: rgba(30, 30, 34, 0.5);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 0.5px rgba(255, 255, 255, 0.07);
+}
+
+/* Блик на стекле: светлая полоса скользит при прокрутке (--shine ставит app.js) */
+.content .card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    110deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.045) 46%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.045) 54%,
+    transparent 62%
+  );
+  background-size: 300% 100%;
+  background-position: calc(var(--shine, 30) * 1%) 0;
+  pointer-events: none;
 }
 
 /* Тонкая линия между строками группы */
@@ -666,23 +752,220 @@ select.input,
   border-top: 0;
 }
 
-.progress-track {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: var(--fill);
-}
-
-.progress-bar {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent-bar);
+/* Строка прогресса: маленькое кольцо, «Сдано 3 из 7» и процент справа */
+.card > .progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .progress-text {
-  margin-top: 6px;
+  flex: 1;
   color: var(--label-2);
   font-size: 13px;
+}
+
+.progress-percent {
+  color: var(--label-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Кольца прогресса, как в Apple Watch ===== */
+.ring {
+  flex: none;
+  /* Дуга начинается сверху, а не справа */
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.ring-small {
+  width: 28px;
+  height: 28px;
+}
+
+.ring-track,
+.ring-bar {
+  fill: none;
+  stroke-width: 14;
+}
+
+.ring-track {
+  stroke: var(--fill);
+}
+
+.ring-bar {
+  stroke: var(--accent-bar);
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+}
+
+/* Полное кольцо становится зелёным и светится */
+.ring-full .ring-bar {
+  stroke: #30d158;
+  filter: drop-shadow(0 0 4px rgba(48, 209, 88, 0.6));
+}
+
+/* Пустое кольцо: круглый кончик линии нулевой длины виден как точка — прячем его */
+.ring-empty .ring-bar {
+  stroke-linecap: butt;
+}
+
+/* Большое кольцо в профиле с процентом в центре */
+.semester-progress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.big-ring {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+}
+
+.ring-big {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ring-big .ring-track,
+.ring-big .ring-bar {
+  stroke-width: 11;
+}
+
+.big-ring-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.big-ring-text {
+  min-width: 0;
+}
+
+/* ===== Числа, которые «докручиваются» ===== */
+.rolling-number {
+  display: inline-block;
+  color: var(--label);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.roll-up {
+  animation: roll-up 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.roll-down {
+  animation: roll-down 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes roll-up {
+  from {
+    opacity: 0;
+    transform: translateY(70%);
+  }
+}
+
+@keyframes roll-down {
+  from {
+    opacity: 0;
+    transform: translateY(-70%);
+  }
+}
+
+/* ===== Конфетти ===== */
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  margin: -6px 0 0 -4px;
+  border-radius: 2px;
+}
+
+.confetti-round {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ===== Большая галочка, когда сданы все работы предмета ===== */
+.card-celebrate {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: rgba(48, 209, 88, 0.12);
+  pointer-events: none;
+  animation: celebrate-fade 1.6s ease forwards;
+}
+
+.card-celebrate svg {
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 0 12px rgba(48, 209, 88, 0.6));
+  animation: celebrate-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.celebrate-circle,
+.celebrate-check {
+  fill: none;
+  stroke: #30d158;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+}
+
+.celebrate-circle {
+  stroke-width: 6;
+  animation: draw 0.5s ease-out both;
+}
+
+/* Галочка «рисуется» после круга */
+.celebrate-check {
+  stroke-width: 9;
+  animation: draw 0.35s ease-out 0.35s both;
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes celebrate-pop {
+  from {
+    transform: scale(0.4);
+  }
+}
+
+@keyframes celebrate-fade {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* ===== Работы ===== */
@@ -925,26 +1208,60 @@ select.input,
   padding: 14px 16px;
 }
 
+/* Узорный аватар: круглая кнопка, внутри SVG-узор */
 .avatar {
-  display: grid;
+  position: relative;
   flex: none;
-  place-items: center;
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-  color: var(--on-accent);
-  font-size: 24px;
-  font-weight: 600;
+  background: var(--fill);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Тонкая светлая кромка поверх узора */
+.avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.avatar:active {
+  transform: scale(0.9);
+}
+
+/* Смена узора: аватар поворачивается и «распрямляется» */
+.avatar-change svg {
+  animation: avatar-change 0.5s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+
+@keyframes avatar-change {
+  from {
+    opacity: 0.2;
+    transform: rotate(-120deg) scale(0.6);
+  }
 }
 
 .profile-card-text {
   min-width: 0;
 }
 
-/* Аватар и текст стоят в одну строку, поэтому линия-разделитель группы здесь не нужна */
-.profile-card > * + * {
+/* Аватар и текст (а также кольцо и текст) стоят в одну строку,
+   поэтому линия-разделитель группы здесь не нужна */
+.profile-card > * + *,
+.semester-progress > * + * {
   border-top: none;
 }
 
